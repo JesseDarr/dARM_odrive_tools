@@ -22,6 +22,7 @@ tools/
 ├── console.py              - TUI test console to control motors
 ├── convert_id.py           - Changes ODrive node ids
 ├── gamecontroller.py       - Game controller console to control motors
+├── reset_interfaces.sh     - Used to reset CAN and bluetooth interfaces
 ├── setup.py                - Applies config.py values to all ODrives
 ├── velocity.py             - Very dengerous, do not use!!! only use to lube joint 0
 ├── data
