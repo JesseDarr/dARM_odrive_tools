@@ -13,7 +13,7 @@ from src.configure import load_endpoints
 
 # Step increments
 INCREMENT_DEFAULT = 0.1
-INCREMENT_GRIPPER = 0.01
+INCREMENT_GRIPPER = 0.1
 
 class ShoulderController:
     """
@@ -60,16 +60,14 @@ class ODriveSlider(urwid.WidgetWrap):
       - A pair of ODrives in a special mode (shoulder or forearm).
     """
     def __init__(self, node_ids, bus, endpoints, min_val, max_val,
-                 step_size=INCREMENT_DEFAULT,  # <--- NEW
-                 shared_forearm=None, forearm_mode=None,
-                 shared_shoulder=None):
-        self.node_ids  = node_ids
-        self.bus       = bus
-        self.endpoints = endpoints
-        self.min_val   = min_val
-        self.max_val   = max_val
-        self.value     = 0.0
-        self.step_size       = step_size        # Step size (default = 0.1) or custom if specified
+                 step_size = INCREMENT_DEFAULT, shared_forearm = None, forearm_mode = None, shared_shoulder = None):
+        self.node_ids        = node_ids
+        self.bus             = bus
+        self.endpoints       = endpoints
+        self.min_val         = min_val
+        self.max_val         = max_val
+        self.value           = 0.0
+        self.step_size       = step_size        
         self.shared_forearm  = shared_forearm
         self.forearm_mode    = forearm_mode     # 'unison', 'diff', or None
         self.shared_shoulder = shared_shoulder  # If not None => shoulder joint
@@ -172,88 +170,48 @@ def update_metrics_textbox(bus, node_ids, endpoints, metrics_text, loop):
         loop.draw_screen()
 
 def main():
+    # Setup CAN interface, discover nodes and load endpoints
     signal.signal(signal.SIGINT, signal_handler)
-    bus       = can.interface.Bus("can0", bustype="socketcan")
-    node_ids  = list(discover_node_ids(bus))
+    bus       = can.interface.Bus("can0", bustype = "socketcan")
+    node_ids  = list(discover_node_ids(bus)).sort()
     endpoints = load_endpoints()
 
     if not node_ids:
         print("No ODrives detected on the CAN network. Exiting.")
         return
-
-    node_ids.sort()
     print(f"Detected ODrive Node IDs: {node_ids}")
 
     # Set each discovered node to CLOSED_LOOP_CONTROL
-    for nd in node_ids:
-        if not set_closed_loop_control(bus, nd):
-            print(f"[ERROR] Could not set node {nd} to CLOSED_LOOP_CONTROL. Exiting.")
+    for id in node_ids:
+        if not set_closed_loop_control(bus, id):
+            print(f"[ERROR] Could not set node {id} to CLOSED_LOOP_CONTROL. Exiting.")
             bus.shutdown()
             return
 
+    # Setup sliders
     sliders = []
 
-    # Single slider for node 0
+    # Single slider for nodes 0, 3, 4, and 7
     if 0 in node_ids: sliders.append(ODriveSlider([0], bus, endpoints, -4.8, 4.8))
-
-    # Shoulder: node 1,2
-    if 1 in node_ids and 2 in node_ids:
-        shoulder_ctrl = ShoulderController(bus, [1, 2], endpoints)
-        slider_shoulder = ODriveSlider(
-            [1, 2],
-            bus,
-            endpoints,
-            min_val         =- 4.8,
-            max_val         = 4.8,
-            step_size       = INCREMENT_DEFAULT,     # shoulder uses default 0.1
-            shared_shoulder = shoulder_ctrl
-        )
-        sliders.append(slider_shoulder)
-
-    # Single slider for node 3
     if 3 in node_ids: sliders.append(ODriveSlider([3], bus, endpoints, -4.8, 4.8))
-
-    # Single slider for node 4
     if 4 in node_ids: sliders.append(ODriveSlider([4], bus, endpoints, -4.8, 4.8))
+    if 7 in node_ids: sliders.append(ODriveSlider([7], bus, endpoints, -4.8, 4.8, INCREMENT_GRIPPER))
 
-    # Forearm: node 5,6 => unison/diff
+    # Single slider for Shoulder: nodes 1, 2
+    if 1 in node_ids and 2 in node_ids:
+        shoulder_ctrl   = ShoulderController(bus, [1, 2], endpoints)
+        slider_shoulder = ODriveSlider([1, 2], bus, endpoints, -4.8, 4.8, shared_shoulder = shoulder_ctrl)
+        sliders.append(slider_shoulder)
+    
+    # Double sliders for Forearm: node 5, 6 => unison/diff
     if 5 in node_ids and 6 in node_ids:
-        forearm_ctrl = ForearmController(bus, [5, 6], endpoints)
-        slider_unison = ODriveSlider(
-            [5, 6],
-            bus,
-            endpoints,
-            min_val        =- 25,
-            max_val        = 25,
-            step_size      = INCREMENT_DEFAULT,     # forearm uses default 0.1
-            shared_forearm = forearm_ctrl,
-            forearm_mode   = 'unison'
-        )
-        slider_diff = ODriveSlider(
-            [5, 6],
-            bus,
-            endpoints,
-            min_val        =- 25,
-            max_val        = 25,
-            step_size      = INCREMENT_DEFAULT,   
-            shared_forearm = forearm_ctrl,
-            forearm_mode   = 'diff'
-        )
+        forearm_ctrl  = ForearmController(bus, [5, 6], endpoints)
+        slider_unison = ODriveSlider([5, 6], bus, endpoints, -25, 25, shared_forearm = forearm_ctrl, forearm_mode = 'unison')
+        slider_diff   = ODriveSlider([5, 6], bus, endpoints, -25, 25, shared_forearm = forearm_ctrl, forearm_mode = 'diff')
         sliders.append(slider_unison)
         sliders.append(slider_diff)
 
-    # Gripper (node 7, 5208): smaller increments
-    if 7 in node_ids:
-        # Example range might be narrower if the gripper doesn't move as far
-        sliders.append(ODriveSlider(
-            [7],
-            bus,
-            endpoints,
-            min_val   = -0.1,
-            max_val   = 0.73,
-            step_size = INCREMENT_GRIPPER
-        ))
-
+    # Setup URWID interface
     columns      = urwid.Columns([urwid.LineBox(s) for s in sliders])
     metrics_text = urwid.Text("Fetching metrics...", align='left')
     pile         = urwid.Pile([columns, metrics_text])
@@ -262,6 +220,7 @@ def main():
         footer = urwid.Text("Press ESC to exit | Up/Down to change value | Left/Right to switch slider", align = 'center')
     )
 
+    # Setup URWID loop
     loop = urwid.MainLoop(
         frame,
         palette         = [('reversed', 'standout', '')],
@@ -275,6 +234,7 @@ def main():
         daemon = True
     ).start()
 
+    # Run URWID Loop
     try:
         loop.run()
     except KeyboardInterrupt:
