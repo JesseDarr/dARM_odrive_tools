@@ -11,7 +11,7 @@ These tools provide functionality for interacting with ODrive devices via a CAN 
 - **calibrate.py**: Runs ODrive calibration sequence on each detected ODrive, one at a time.
 - **clear_errors.py**: Clears all errors on detected ODrive devices.
 - **setup.py**: Configures ODrive devices based on settings specified in `config.py`.
-- **test_console.py**: Slider tUI, controls position for all ODrvies.
+- **test_console.py**: Slider TUI, controls position for all ODrvies.
 
 ## Project Structure
 ```plaintext
