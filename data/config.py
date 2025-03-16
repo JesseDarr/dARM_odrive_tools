@@ -152,7 +152,7 @@ config = {
             {"path": "axis0.config.can.bus_voltage_msg_rate_ms",        "value": 10},
             
             # Gains and limits
-            {"path": "axis0.controller.config.pos_gain",                "value": 50},  
+            {"path": "axis0.controller.config.pos_gain",                "value": 25},  
             {"path": "axis0.controller.config.vel_gain",                "value": 0.04},
             {"path": "axis0.controller.config.vel_integrator_gain",     "value": 0.004}, 
             {"path": "axis0.trap_traj.config.vel_limit",                "value": 50},  

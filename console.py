@@ -195,18 +195,19 @@ def main():
     # Setup sliders
     sliders = []
 
-    # Single slider for nodes 0, 3, 4, and 7
+    # Single slider for node 0
     if 0 in node_ids: sliders.append(ODriveSlider([0], bus, endpoints, -4.8, 4.8))
-    if 3 in node_ids: sliders.append(ODriveSlider([3], bus, endpoints, -4.8, 4.8))
-    if 4 in node_ids: sliders.append(ODriveSlider([4], bus, endpoints, -4.8, 4.8))
-    if 7 in node_ids: sliders.append(ODriveSlider([7], bus, endpoints, -4.8, 4.8, INCREMENT_GRIPPER))
 
     # Single slider for Shoulder: nodes 1, 2
     if 1 in node_ids and 2 in node_ids:
         shoulder_ctrl   = ShoulderController(bus, [1, 2], endpoints)
         slider_shoulder = ODriveSlider([1, 2], bus, endpoints, -4.8, 4.8, shared_shoulder = shoulder_ctrl)
         sliders.append(slider_shoulder)
-    
+
+    # Single slider for nodes 3 and 4
+    if 3 in node_ids: sliders.append(ODriveSlider([3], bus, endpoints, -4.8, 4.8))
+    if 4 in node_ids: sliders.append(ODriveSlider([4], bus, endpoints, -4.8, 4.8))
+
     # Double sliders for Forearm: node 5, 6 => unison/diff
     if 5 in node_ids and 6 in node_ids:
         forearm_ctrl  = ForearmController(bus, [5, 6], endpoints)
@@ -214,6 +215,9 @@ def main():
         slider_diff   = ODriveSlider([5, 6], bus, endpoints, -25, 25, shared_forearm = forearm_ctrl, forearm_mode = 'diff')
         sliders.append(slider_unison)
         sliders.append(slider_diff)
+
+    # Single slider for node
+    if 7 in node_ids: sliders.append(ODriveSlider([7], bus, endpoints, -4.8, 4.8, INCREMENT_GRIPPER))
 
     # Setup URWID interface
     columns      = urwid.Columns([urwid.LineBox(s) for s in sliders])
