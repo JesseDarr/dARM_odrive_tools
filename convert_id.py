@@ -14,7 +14,7 @@ def main():
     old_id = int(sys.argv[1])
     new_id = int(sys.argv[2])
 
-    bus = can.interface.Bus("can0", bustype="socketcan")
+    bus = can.interface.Bus("can0", interface="socketcan")
     endpoints = load_endpoints()
 
     discovered = discover_node_ids(bus)

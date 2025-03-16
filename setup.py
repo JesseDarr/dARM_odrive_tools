@@ -19,7 +19,7 @@ MOTOR_MAP = {
 def main():
     bus = None
     try:
-        bus = can.interface.Bus("can0", bustype="socketcan")
+        bus = can.interface.Bus("can0", interface="socketcan")
         node_ids = discover_node_ids(bus)
 
         # Load configuration and endpoints

@@ -170,12 +170,16 @@ def update_metrics_textbox(bus, node_ids, endpoints, metrics_text, loop):
         loop.draw_screen()
 
 def main():
+    # Load endpoints from file
+    endpoints = load_endpoints()
+
     # Setup CAN interface, discover nodes and load endpoints
     signal.signal(signal.SIGINT, signal_handler)
     bus       = can.interface.Bus("can0", bustype = "socketcan")
-    node_ids  = list(discover_node_ids(bus)).sort()
-    endpoints = load_endpoints()
+    node_ids  = list(discover_node_ids(bus))
+    node_ids.sort()
 
+    # Exit if we didn't find any nodes
     if not node_ids:
         print("No ODrives detected on the CAN network. Exiting.")
         return

@@ -13,7 +13,7 @@ def main():
 
     # Get CAN bus object
     try:
-        bus = can.interface.Bus("can0", bustype="socketcan")
+        bus = can.interface.Bus("can0", interface="socketcan")
     except Exception as e:
         print(f"[ERROR] Unable to open CAN bus: {e}")
         return

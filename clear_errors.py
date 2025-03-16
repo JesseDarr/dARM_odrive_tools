@@ -15,7 +15,7 @@ def main():
 
     try:
         # Initialize CAN bus
-        bus = can.interface.Bus("can0", bustype="socketcan")
+        bus = can.interface.Bus("can0", interface="socketcan")
 
         # Discover ODrive nodes on the network
         node_ids = discover_node_ids(bus)

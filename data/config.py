@@ -122,7 +122,7 @@ config = {
             # Motor settings
             {"path": "axis0.config.motor.motor_type",                   "value": 2},
             {"path": "axis0.config.motor.phase_resistance",             "value": 16},
-            {"path": "axis0.config.motor.pole_pairs",                   "value": 7},  
+            {"path": "axis0.config.motor.pole_pairs",                   "value": 21},  
             {"path": "axis0.config.motor.torque_constant",              "value": 0.345}, 
             {"path": "axis0.config.motor.current_hard_max",             "value": 3.5},  
             {"path": "axis0.config.motor.current_soft_max",             "value": 3},  

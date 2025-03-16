@@ -73,7 +73,7 @@ def main():
 
     node_id = int(sys.argv[1])
 
-    bus = can.interface.Bus("can0", bustype="socketcan")
+    bus = can.interface.Bus("can0", interface="socketcan")
     discovered = discover_node_ids(bus)
     if node_id not in discovered:
         print(f"[ERROR] Node {node_id} not found on CAN bus.")
