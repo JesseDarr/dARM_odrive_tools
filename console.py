@@ -182,6 +182,7 @@ def main():
     # Exit if we didn't find any nodes
     if not node_ids:
         print("No ODrives detected on the CAN network. Exiting.")
+        bus.shutdown()
         return
     print(f"Detected ODrive Node IDs: {node_ids}")
 
