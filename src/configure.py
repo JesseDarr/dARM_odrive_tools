@@ -2,6 +2,7 @@
 import json
 import os
 import struct
+import time
 from src.can_utils import send_can_message, receive_can_message
 
 # Constants for ODrive CAN operations
@@ -158,3 +159,43 @@ def setup_odrive(bus, node_id, settings, endpoints):
     except Exception as e:
         print(f"[ERROR] Unexpected error during ODrive setup: {e}")
         return False
+    
+def calibrate_motor(bus, node_id, timeout=20):
+    """
+    Initiates a calibration sequence on the specified ODrive node.
+    Sends a calibration command and polls the node’s state until it reaches the IDLE state,
+    which indicates that calibration is complete.
+
+    Returns True if calibration completes within the timeout; otherwise, returns False.
+    """    
+    # Load endpoint definitions.
+    endpoints = load_endpoints()
+    current_state_ep = endpoints["endpoints"].get("axis0.current_state")
+    if not current_state_ep:
+        print("[ERROR] 'axis0.current_state' endpoint not found in endpoints file.")
+        return False
+    
+    endpoint_id = current_state_ep["id"]
+    endpoint_type = current_state_ep["type"]
+    CALIBRATION_STATE = 3  # Full calibration command (adjust as needed)
+    IDLE_STATE = 1         # IDLE state indicating calibration complete
+
+    # Send the calibration command.
+    if not send_can_message(bus, node_id, 0x07, '<I', CALIBRATION_STATE):
+        print(f"[ERROR] Failed to send calibration command to node {node_id}.")
+        return False
+
+    # Poll for calibration completion.
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        state = read_config(bus, node_id, endpoint_id, endpoint_type)
+        if state is None:
+            print(f"[WARNING] No state received from node {node_id}.")
+        elif state == IDLE_STATE:
+            return True
+        else:
+            print(f"[INFO] Node {node_id} state: {state}. Waiting for calibration to complete...")
+        time.sleep(1)
+
+    print(f"[ERROR] Calibration timeout for node {node_id}.")
+    return False
