@@ -13,7 +13,7 @@ from src.configure import load_endpoints
 
 # Step increments
 INCREMENT_DEFAULT = 0.1
-INCREMENT_GRIPPER = 0.1
+INCREMENT_GRIPPER = 0.01
 
 class ShoulderController:
     """
@@ -76,7 +76,9 @@ class ODriveSlider(urwid.WidgetWrap):
         if self.shared_shoulder:                                    label_text = f"Shoulder (Nodes {node_ids[0]}, {node_ids[1]}): {self.value:.1f}"
         elif self.shared_forearm and self.forearm_mode == 'unison': label_text = f"Forearm UNISON: {self.value:.1f}"
         elif self.shared_forearm and self.forearm_mode == 'diff':   label_text = f"Forearm DIFF: {self.value:.1f}"
-        else:                                                       label_text = f"ODrive {', '.join(map(str, self.node_ids))}: {self.value:.1f}"
+        else: 
+            if 7 in self.node_ids: label_text = f"ODrive {', '.join(map(str, self.node_ids))}: {self.value:.2f}"
+            else:                  label_text = f"ODrive {', '.join(map(str, self.node_ids))}: {self.value:.1f}"
 
         self.label = urwid.Text(label_text)
         self.pile  = urwid.Pile([self.label])
@@ -89,8 +91,11 @@ class ODriveSlider(urwid.WidgetWrap):
         if self.shared_shoulder:                                    self.label.set_text(f"Shoulder (Nodes {self.node_ids[0]}, {self.node_ids[1]}): {self.value:.1f}")
         elif self.shared_forearm and self.forearm_mode == 'unison': self.label.set_text(f"Forearm UNISON: {self.value:.1f}")
         elif self.shared_forearm and self.forearm_mode == 'diff':   self.label.set_text(f"Forearm DIFF: {self.value:.1f}")
-        else:                                                       self.label.set_text(f"ODrive {', '.join(map(str, self.node_ids))}: {self.value:.1f}")
-
+        else:                                                       
+            # For node 7, show an extra digit; for others, keep one decimal place
+            if 7 in self.node_ids:  self.label.set_text(f"ODrive {', '.join(map(str, self.node_ids))}: {self.value:.2f}")
+            else:                   self.label.set_text(f"ODrive {', '.join(map(str, self.node_ids))}: {self.value:.1f}")
+            
         self.move_motor()
 
     def move_motor(self):
@@ -218,7 +223,7 @@ def main():
         sliders.append(slider_diff)
 
     # Single slider for node
-    if 7 in node_ids: sliders.append(ODriveSlider([7], bus, endpoints, -4.8, 4.8, INCREMENT_GRIPPER))
+    if 7 in node_ids: sliders.append(ODriveSlider([7], bus, endpoints, -0.1, 0.73, INCREMENT_GRIPPER))
 
     # Setup URWID interface
     columns      = urwid.Columns([urwid.LineBox(s) for s in sliders])

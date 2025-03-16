@@ -122,7 +122,7 @@ config = {
             # Motor settings
             {"path": "axis0.config.motor.motor_type",                   "value": 2},
             {"path": "axis0.config.motor.phase_resistance",             "value": 16},
-            {"path": "axis0.config.motor.pole_pairs",                   "value": 21},  
+            {"path": "axis0.config.motor.pole_pairs",                   "value": 11},  
             {"path": "axis0.config.motor.torque_constant",              "value": 0.345}, 
             {"path": "axis0.config.motor.current_hard_max",             "value": 3.5},  
             {"path": "axis0.config.motor.current_soft_max",             "value": 3},  
@@ -152,7 +152,7 @@ config = {
             {"path": "axis0.config.can.bus_voltage_msg_rate_ms",        "value": 10},
             
             # Gains and limits
-            {"path": "axis0.controller.config.pos_gain",                "value": 25},  
+            {"path": "axis0.controller.config.pos_gain",                "value": 50},  
             {"path": "axis0.controller.config.vel_gain",                "value": 0.04},
             {"path": "axis0.controller.config.vel_integrator_gain",     "value": 0.004}, 
             {"path": "axis0.trap_traj.config.vel_limit",                "value": 50},  
