@@ -47,7 +47,7 @@ JOINT3_MIN, JOINT3_MAX = -5.9,  0.0
 
 BEND_MIN,   BEND_MAX     =  -5.0,  5.0 # Wrist
 ROTATE_MIN, ROTATE_MAX   = -10.0, 10.0 # Wrist
-TRIGGER_MIN, TRIGGER_MAX =  -0.05, 0.7
+TRIGGER_MIN, TRIGGER_MAX =  -0.1, 0.73
 
 stop_event = threading.Event()
 
@@ -309,7 +309,7 @@ def joystick_thread_func(
 def main():
     signal.signal(signal.SIGINT, signal_handler)
 
-    bus = can.interface.Bus("can0", bustype = "socketcan")
+    bus = can.interface.Bus("can0", interface = "socketcan")
     discovered = list(discover_node_ids(bus))
     endpoints  = load_endpoints()
 

@@ -180,7 +180,7 @@ def main():
 
     # Setup CAN interface, discover nodes and load endpoints
     signal.signal(signal.SIGINT, signal_handler)
-    bus       = can.interface.Bus("can0", bustype = "socketcan")
+    bus       = can.interface.Bus("can0", interface = "socketcan")
     node_ids  = list(discover_node_ids(bus))
     node_ids.sort()
 
