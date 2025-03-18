@@ -139,7 +139,6 @@ def set_odrive_parameter(bus, node_id, path, value, endpoints, tolerance=1e-2):
     print(f"[INFO] Node {node_id} - {path:50} - Updated: {value}")
     return True
 
-
 def setup_odrive(bus, node_id, settings, endpoints):
     """
     Configures an entire ODrive node using provided settings.
@@ -159,22 +158,20 @@ def setup_odrive(bus, node_id, settings, endpoints):
     except Exception as e:
         print(f"[ERROR] Unexpected error during ODrive setup: {e}")
         return False
-    
+
 def calibrate_motor(bus, node_id, timeout=20):
     """
     Initiates a calibration sequence on the specified ODrive node.
     Sends a calibration command and polls the node’s state until it reaches the IDLE state,
     which indicates that calibration is complete.
-
+    
+    Once the calibration is complete, this function calls save_config to persist the configuration.
+    
     Returns True if calibration completes within the timeout; otherwise, returns False.
-    """    
+    """
     # Load endpoint definitions.
     endpoints = load_endpoints()
     current_state_ep = endpoints["endpoints"].get("axis0.current_state")
-    if not current_state_ep:
-        print("[ERROR] 'axis0.current_state' endpoint not found in endpoints file.")
-        return False
-    
     endpoint_id = current_state_ep["id"]
     endpoint_type = current_state_ep["type"]
     CALIBRATION_STATE = 3  # Full calibration command (adjust as needed)
@@ -192,6 +189,9 @@ def calibrate_motor(bus, node_id, timeout=20):
         if state is None:
             print(f"[WARNING] No state received from node {node_id}.")
         elif state == IDLE_STATE:
+            # Persist the calibration using save_config.
+            save_ep = endpoints["endpoints"].get("save_configuration")
+            save_config(bus, node_id, save_ep["id"])
             return True
         else:
             print(f"[INFO] Node {node_id} state: {state}. Waiting for calibration to complete...")
