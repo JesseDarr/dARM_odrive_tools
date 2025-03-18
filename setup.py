@@ -19,9 +19,13 @@ MOTOR_MAP = {
 def main():
     bus = None
     try:
-        bus = can.interface.Bus("can0", bustype="socketcan")
+        bus = can.interface.Bus("can0", interface="socketcan")
         node_ids = discover_node_ids(bus)
-
+        if not node_ids:
+            print("[ERROR] No ODrives detected on the CAN bus.")
+            bus.shutdown()
+            return
+        
         # Load configuration and endpoints
         config_data = load_configuration()
         endpoints = load_endpoints()
