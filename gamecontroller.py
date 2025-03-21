@@ -28,8 +28,8 @@ AXIS_RIGHT_TRIGGER= 2
 UPDATE_RATE              = 30.0
 DEAD_ZONE                = 0.25
 VELOCITY_SCALING         = 1.5
-FOREARM_VELOCITY_SCALING = 2.0
-GRIPPER_SCALING          = 0.5
+FOREARM_VELOCITY_SCALING = 3.0
+GRIPPER_SCALING          = 1.0
 
 # ------------------------------------------------------------------------------
 # 2) Joint Range Definitions
