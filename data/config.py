@@ -43,7 +43,7 @@ config = {
 
             # Gains and limits
             {"path": "axis0.controller.config.pos_gain",                            "value": 100},   # proportional gain # stiffness
-            {"path": "axis0.controller.config.vel_gain",                            "value": 0.55},   # derivative gain   # dampen overshoot
+            {"path": "axis0.controller.config.vel_gain",                            "value": 0.35},   # derivative gain   # dampen overshoot
             {"path": "axis0.controller.config.vel_integrator_gain",                 "value": 1},   # integral gain     # adjust steady-state error
             {"path": "axis0.trap_traj.config.vel_limit",                            "value": 8},  
             {"path": "axis0.trap_traj.config.accel_limit",                          "value": 4},  
