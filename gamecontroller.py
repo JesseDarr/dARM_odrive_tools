@@ -78,7 +78,7 @@ def handle_input(key, loop, node_ids, bus, joint_positions):
         stop_event.set()
         raise urwid.ExitMainLoop()
 
-def clean_shutdown(node_ids, bus, joint_positions):
+def clean_shutdown(node_ids, bus):
     print("\nExiting... Setting discovered ODrives to pos=0 => IDLE => shutdown.")
     for nid in node_ids:
         try:
@@ -310,18 +310,18 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
 
     bus = can.interface.Bus("can0", interface = "socketcan")
-    discovered = list(discover_node_ids(bus))
+    node_ids = list(discover_node_ids(bus))
     endpoints  = load_endpoints()
 
-    if not discovered:
+    if not node_ids:
         print("[ERROR] No ODrives found on the CAN bus.")
         return
 
-    discovered.sort()
-    print(f"Discovered ODrive Node IDs: {discovered}")
+    node_ids.sort()
+    print(f"Discovered ODrive Node IDs: {node_ids}")
 
     # Set each discovered node to closed-loop
-    for nid in discovered:
+    for nid in node_ids:
         if not set_closed_loop_control(bus, nid):
             print(f"[ERROR] Could not set node {nid} to CLOSED_LOOP_CONTROL.")
             bus.shutdown()
@@ -332,6 +332,7 @@ def main():
     if pygame.joystick.get_count() == 0:
         print("[ERROR] No joystick found.")
         pygame.quit()
+        clean_shutdown(node_ids, bus)
         return
 
     stick = pygame.joystick.Joystick(0)
@@ -339,18 +340,18 @@ def main():
     print(f"Joystick: {stick.get_name()}")
     print(f"# Axes: {stick.get_numaxes()}")
 
-    max_id = max(discovered)
+    max_id = max(node_ids)
     joint_positions = [0.0] * (max_id + 1)
 
     # Shoulder => node1,2
     shoulder_ctrl = None
-    if (1 in discovered) and (2 in discovered):
+    if (1 in node_ids) and (2 in node_ids):
         shoulder_ctrl = ShoulderController(bus, [1,2])
         print("[INFO] ShoulderController for node1,node2 created.")
 
     # Wrist => node5,6
     wrist_ctrl = None
-    if (5 in discovered) and (6 in discovered):
+    if (5 in node_ids) and (6 in node_ids):
         wrist_ctrl = WriteController(bus, [5,6])
         print("[INFO] WriteController for node5,node6 created.")
 
@@ -366,19 +367,19 @@ def main():
     loop = urwid.MainLoop(
         frame,
         palette = [('reversed','standout','')],
-        unhandled_input = lambda k: handle_input(k, loop, discovered, bus, joint_positions)
+        unhandled_input = lambda k: handle_input(k, loop, node_ids, bus, joint_positions)
     )
 
     ui_thread = threading.Thread(
         target = update_ui_thread,
-        args = (bus, discovered, endpoints, metrics_text, joystick_text, loop),
+        args = (bus, node_ids, endpoints, metrics_text, joystick_text, loop),
         daemon = True
     )
     ui_thread.start()
 
     joy_thread = threading.Thread(
         target = joystick_thread_func,
-        args = (bus, discovered, joint_positions, shoulder_ctrl, wrist_ctrl),
+        args = (bus, node_ids, joint_positions, shoulder_ctrl, wrist_ctrl),
         daemon = True
     )
     joy_thread.start()
@@ -393,7 +394,7 @@ def main():
         ui_thread.join()
         joy_thread.join()
         print("[INFO] Threads joined => final shutdown.")
-        clean_shutdown(discovered, bus, joint_positions)
+        clean_shutdown(node_ids, bus)
         pygame.quit()
 
 
