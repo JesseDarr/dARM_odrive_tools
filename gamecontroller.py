@@ -47,7 +47,7 @@ JOINT3_MIN, JOINT3_MAX = -5.9,  0.0
 
 BEND_MIN,   BEND_MAX     =  -5.0,  5.0 # Wrist
 ROTATE_MIN, ROTATE_MAX   = -10.0, 10.0 # Wrist
-TRIGGER_MIN, TRIGGER_MAX =  -0.1, 0.73
+TRIGGER_MIN, TRIGGER_MAX =  -0.08, 0.73
 
 stop_event = threading.Event()
 
