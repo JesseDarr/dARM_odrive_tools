@@ -174,7 +174,7 @@ def calibrate_motor(bus, node_id, timeout=20):
     current_state_ep = endpoints["endpoints"].get("axis0.current_state")
     endpoint_id = current_state_ep["id"]
     endpoint_type = current_state_ep["type"]
-    CALIBRATION_STATE = 3  # Full calibration command (adjust as needed)
+    CALIBRATION_STATE = 3  # Full calibration command 
     IDLE_STATE = 1         # IDLE state indicating calibration complete
 
     # Send the calibration command.
@@ -185,6 +185,7 @@ def calibrate_motor(bus, node_id, timeout=20):
     # Poll for calibration completion.
     start_time = time.time()
     while time.time() - start_time < timeout:
+        time.sleep(1)
         state = read_config(bus, node_id, endpoint_id, endpoint_type)
         if state is None:
             print(f"[WARNING] No state received from node {node_id}.")
@@ -195,7 +196,6 @@ def calibrate_motor(bus, node_id, timeout=20):
             return True
         else:
             print(f"[INFO] Node {node_id} state: {state}. Waiting for calibration to complete...")
-        time.sleep(1)
 
     print(f"[ERROR] Calibration timeout for node {node_id}.")
     return False
