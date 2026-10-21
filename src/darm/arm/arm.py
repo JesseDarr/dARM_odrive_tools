@@ -34,6 +34,7 @@ log = logging.getLogger(__name__)
 
 _ARM_TIMEOUT_S = 2.0
 _ARRIVAL_POLL_S = 0.02
+_NUDGE_LEAD_S = 0.25
 _DISCOVERY_MIN_S = 0.5
 
 
@@ -177,8 +178,24 @@ class Arm:
             return self._desired[joint]
 
     def nudge(self, joint: str, delta: float) -> float:
+        """Move a joint's target by delta, but never more than _NUDGE_LEAD_S of travel ahead of the joint.
+
+        Without the bound, key repeat or a stick faster than the joint piles target up
+        far ahead, and the joint keeps moving long after the input stops. A nudge may
+        stop short; it never moves the target against the direction asked for.
+        """
         with self._lock:
-            return self.set_target(joint, self._desired.get(joint, 0.0) + delta)
+            if self._state is not ArmState.ARMED:
+                return self._desired.get(joint, 0.0)
+            current = self._desired[joint]
+            lead = self.joint(joint).max_speed * _NUDGE_LEAD_S
+            steering = self._commanded[joint]
+            target = current + delta
+            if delta > 0:
+                target = min(target, max(current, steering + lead))
+            elif delta < 0:
+                target = max(target, min(current, steering - lead))
+            return self.set_target(joint, target)
 
     def freeze(self, reason: str) -> None:
         with self._lock:
@@ -191,10 +208,12 @@ class Arm:
             if self._state is not ArmState.FROZEN:
                 return
         nodes = self._active_nodes()
+        cleared_at = time.monotonic()
         for node in nodes:
             if node.axis_error:
                 node.clear_errors()
         self._enter_closed_loop([n for n in nodes if n.state is not AxisState.CLOSED_LOOP_CONTROL])
+        self._await_fresh_heartbeats(nodes, since=cleared_at)
         with self._lock:
             problems = self._supervisor.check(time.monotonic(), expect_closed_loop=True)
             if problems:
@@ -403,6 +422,12 @@ class Arm:
         if failed:
             details = ", ".join(f"node {n.node_id} ({describe_errors(n.axis_error)})" for n in failed)
             raise StartupError(f"could not enter closed loop: {details}. Armed nodes are holding position.")
+
+    def _await_fresh_heartbeats(self, nodes: list[ODriveNode], since: float) -> None:
+        """Judge nodes on what they say after a change, not on a heartbeat that was already in flight."""
+        timeout = self.config.safety.heartbeat_timeout_s
+        for node in nodes:
+            node.wait_until(lambda n: n.heartbeat is not None and n.heartbeat.at > since, timeout)
 
     def _hold_where_measured(self) -> None:
         """Make the measured position the target, so nothing moves until someone asks it to."""
