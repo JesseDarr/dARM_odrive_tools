@@ -16,7 +16,7 @@ from darm.odrive.addressing import AddressBook, assign, enumerate_odrives, free_
 from darm.odrive.bus import CanBus
 from darm.odrive.protocol import BROADCAST_NODE_ID, MAX_NODE_ID
 from darm.sim import SimNetwork, simulated_serial
-from tests.conftest import REPO, eventually
+from tests.conftest import REPO, ROBOT, eventually
 from tests.test_commissioning import SimContext
 
 
@@ -55,7 +55,7 @@ def test_enumerate_finds_every_odrive_by_serial(make_sim, channel: str):
     with CanBus(channel, "virtual") as bus:
         found = enumerate_odrives(bus, AddressBook(bus), quiet_s=0.3)
     assert {reply.serial_number: reply.node_id for reply in found.values()} == {
-        simulated_serial(n): n for n in range(8)
+        simulated_serial(n): n for n in ROBOT.node_ids
     }
 
 
@@ -68,12 +68,12 @@ def test_enumerate_sees_unaddressed_odrives(make_sim, channel: str):
 
 
 def test_assign_gives_unaddressed_odrives_their_ids_and_saves(make_sim, channel, config, tmp_path: Path):
-    sim = make_sim(node_ids=(0, 3, 7), freshly_flashed=True)
+    sim = make_sim(node_ids=(0, 3, 6), freshly_flashed=True)
     ctx = SimContext(config, True, tmp_path, channel)
 
-    assert run_address(ctx, "--assign", *(f"{serial_text(n)}={n}" for n in (0, 3, 7))) == 0
+    assert run_address(ctx, "--assign", *(f"{serial_text(n)}={n}" for n in (0, 3, 6))) == 0
 
-    assert sorted(sim.nodes) == [0, 3, 7]
+    assert sorted(sim.nodes) == [0, 3, 6]
     assert all(node.serial_number == simulated_serial(n) for n, node in sim.nodes.items())
     assert all(node.saved for node in sim.nodes.values())
 
@@ -118,7 +118,7 @@ def test_list_runs_end_to_end_through_the_cli(tmp_path: Path, capsys):
     argv = ["--config", str(REPO / "darm.toml"), "--sim", "--state-dir", str(tmp_path), "address", "--list"]
     assert cli.main(argv) == 0
     out = capsys.readouterr().out
-    assert all(serial_text(n) in out for n in range(8))
+    assert all(serial_text(n) in out for n in ROBOT.node_ids)
 
 
 def test_the_wildcard_serial_is_never_sent(make_sim, channel: str):

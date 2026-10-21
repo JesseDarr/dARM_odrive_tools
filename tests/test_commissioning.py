@@ -21,7 +21,7 @@ from darm.odrive.bus import CanBus
 from darm.odrive.endpoints import EndpointTable
 from darm.odrive.protocol import AxisState, ODriveError, ProcedureResult
 from darm.sim import SimNetwork, place
-from tests.conftest import REPO
+from tests.conftest import REPO, node_of
 
 TOOLS = (address, backup, calibrate, configure, errors, exercise, home)
 
@@ -164,9 +164,10 @@ def test_calibrate_refuses_a_node_with_errors(station: Station):
 
 
 def test_calibrate_targets(config: RobotConfig):
-    assert calibrate._targets([], "shoulder", config) == (1, 2)
-    assert calibrate._targets([], "wrist_twist", config) == (5, 6)
-    assert calibrate._targets([4, 4, 7], None, config) == (4, 7)
+    assert calibrate._targets([], "shoulder", config) == (node_of("shoulder"),)
+    wrist = node_of("wrist_twist")
+    assert calibrate._targets([], "wrist_twist", config) == (wrist, wrist + 1)
+    assert calibrate._targets([4, 4, 6], None, config) == (4, 6)
     for nodes, joint in (([], None), ([3], "elbow"), ([], "tail"), ([9], None)):
         with pytest.raises(ConfigError):
             calibrate._targets(nodes, joint, config)
@@ -215,22 +216,23 @@ def test_home_refuses_while_the_arm_is_held(station: Station):
 
 
 def test_backup_writes_every_readable_setting(station: Station, table: EndpointTable, tmp_path: Path):
-    _, ctx = station(node_ids=(7,))  # The station keeps the network alive.
+    gripper = node_of("gripper")
+    _, ctx = station(node_ids=(gripper,))  # The station keeps the network alive.
     out = tmp_path / "backup.json"
 
     assert run_tool(ctx, "backup", "--out", str(out)) == 0
 
     document = json.loads(out.read_text(encoding="utf-8"))
     assert document["firmware"] == ctx.config.firmware
-    assert list(document["nodes"]) == ["7"]
-    settings = document["nodes"]["7"]
+    assert list(document["nodes"]) == [str(gripper)]
+    settings = document["nodes"][str(gripper)]
     assert settings["axis0.config.motor.pole_pairs"] == 11
     assert "save_configuration" not in settings, "functions are not settings"
     assert len(settings) == sum(1 for e in table if backup._readable(e))
 
 
 def test_backup_refuses_a_firmware_the_odrives_do_not_run(station: Station, tmp_path: Path):
-    _, ctx = station(node_ids=(7,))  # The station keeps the network alive.
+    _, ctx = station(node_ids=(node_of("gripper"),))  # The station keeps the network alive.
     out = tmp_path / "backup.json"
     assert run_tool(ctx, "backup", "--firmware", "0.6.10", "--out", str(out)) == 1
     assert not out.exists()
@@ -241,7 +243,7 @@ def test_backup_refuses_a_firmware_the_odrives_do_not_run(station: Station, tmp_
 
 def test_exercise_sweeps_the_joint_and_puts_it_back(station: Station, config: RobotConfig):
     sim, ctx = station()
-    gripper = sim.nodes[7]
+    gripper = sim.nodes[node_of("gripper")]
     samples: list[float] = []
     running = threading.Event()
     running.set()
@@ -259,7 +261,7 @@ def test_exercise_sweeps_the_joint_and_puts_it_back(station: Station, config: Ro
         running.clear()
         sampler.join()
 
-    turns_per_mm = config.drive_for_node(7).turns_per_unit
+    turns_per_mm = config.drive_for_node(node_of("gripper")).turns_per_unit
     low, high = exercise.sweep_range(config.joints["gripper"], 0.9)
     assert max(samples) == pytest.approx(high * turns_per_mm, abs=0.01)
     assert min(samples) == pytest.approx(low * turns_per_mm, abs=0.01)

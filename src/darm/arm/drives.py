@@ -1,7 +1,7 @@
 """Transmissions: joint units <-> motor turns.
 
 Two mechanisms cover every joint on the arm:
-  DirectDrive        one joint, one or more motors in lockstep (the shoulder has two)
+  DirectDrive        one motor, one joint
   DifferentialDrive  two motors, two joints: turning together twists, turning apart bends
 
 Both are linear, so the same mapping converts positions and velocities.
@@ -30,27 +30,15 @@ class Drive(abc.ABC):
     def to_joint(self, motor_turns: Sequence[float]) -> tuple[float, ...]:
         """Motor turns (in self.nodes order) -> joint values (in self.joints order)."""
 
-    def disagreement(self, motor_turns: Sequence[float]) -> float:
-        """How far apart, in joint units, motors that should agree actually are."""
-        return 0.0
-
 
 class DirectDrive(Drive):
     def to_motor(self, joint_values: Sequence[float]) -> tuple[float, ...]:
         (value,) = joint_values
-        return tuple(sign * self._turns_per_unit * value for sign in self.spec.signs)
+        return (self._turns_per_unit * value,)
 
     def to_joint(self, motor_turns: Sequence[float]) -> tuple[float, ...]:
-        estimates = self._per_motor_estimates(motor_turns)
-        return (sum(estimates) / len(estimates),)
-
-    def disagreement(self, motor_turns: Sequence[float]) -> float:
-        """Ganged motors are bolted to one output. If they disagree, something slipped or broke."""
-        estimates = self._per_motor_estimates(motor_turns)
-        return max(estimates) - min(estimates)
-
-    def _per_motor_estimates(self, motor_turns: Sequence[float]) -> list[float]:
-        return [turns / (sign * self._turns_per_unit) for turns, sign in zip(motor_turns, self.spec.signs, strict=True)]
+        (turns,) = motor_turns
+        return (turns / self._turns_per_unit,)
 
 
 class DifferentialDrive(Drive):

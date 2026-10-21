@@ -1,7 +1,12 @@
-# dARM robot description.
+# dARM2 robot description.
 #
-# Everything specific to this arm lives here. The code knows about joints,
-# transmissions, and ODrives in general; it knows nothing about dARM.
+# Everything specific to the arm lives here. The code knows about joints,
+# transmissions, and ODrives in general; it knows nothing about any one arm.
+#
+# PLACEHOLDER: dARM2's hardware is still being designed. Until it settles, this
+# carries over the original dARM's joint layout, motors and tuning, without its
+# twin-motor shoulder, with dARM2's 27:1 cycloidal reduction on the four primary
+# joints. Replace values as the real parts get built and measured.
 #
 # Units: revolute joints are degrees at the joint output, the gripper is
 # millimetres of finger travel. Zero for every joint is the docked pose.
@@ -19,8 +24,8 @@ bitrate = 1_000_000
 # What each ODrive broadcasts unprompted, in milliseconds (0 = off). The host
 # never polls for these, it listens. Budget: a classic 1 Mbit frame is ~125 µs,
 # and the MCP2515 HAT has two receive buffers, so bursts overrun it long before
-# the bus is full. These rates are ~100 frames/s per node, ~820 frames/s for
-# 8 nodes (~10%). Errors also ride in every heartbeat.
+# the bus is full. These rates are ~100 frames/s per node, ~710 frames/s for
+# 7 nodes (~9%). Errors also ride in every heartbeat.
 [telemetry]
 heartbeat_ms = 50
 encoder_ms = 20
@@ -57,30 +62,33 @@ stages = [
 stage_timeout_s = 20.0
 
 # ------------------------------------------------------------------------------ joints
-# nodes:       ODrive CAN node ids driving this joint.
-# signs:       +1/-1 per node. Ganged motors facing each other get opposite signs.
+# One motor drives one joint. The only exception is a differential (below),
+# where two motors drive two joints together.
+#
+# node:        The ODrive's CAN node id.
 # gear_ratio:  Motor turns per joint turn (revolute joints).
 # mm_per_turn: Linear travel per motor turn (linear joints).
 # min / max:   Hard limits in joint units. The host never commands past them.
-# max_speed:   Host-side slew limit in joint units/s, on top of the ODrive's own trajectory limits.
-# tolerance:   How far measured may drift from commanded, from limits, or between ganged motors.
+# max_speed:   Host-side slew limit in joint units/s. Keep it under the ODrive's
+#              trap_traj vel_limit / gear_ratio (5 turns/s at 27:1 = 66.7 deg/s),
+#              or the ODrive's trajectory falls behind the host's.
+# tolerance:   How far measured may stray from commanded, or past a limit, before it counts.
 
 [[joint]]
 name = "base"                # J0
 motor = "eagle_8308"
-nodes = [0]
-gear_ratio = 9.0
+node = 0
+gear_ratio = 27.0
 min = -192.0
 max = 192.0
-max_speed = 90.0
+max_speed = 60.0
 tolerance = 3.0
 
 [[joint]]
-name = "shoulder"            # J1: two actuators on one axis, mounted facing each other.
+name = "shoulder"            # J1
 motor = "eagle_8308"
-nodes = [1, 2]
-signs = [1, -1]
-gear_ratio = 9.0
+node = 1
+gear_ratio = 27.0
 min = -200.0
 max = 0.0
 max_speed = 60.0
@@ -89,27 +97,27 @@ tolerance = 3.0
 [[joint]]
 name = "upper_arm"           # J2
 motor = "eagle_8308"
-nodes = [3]
-gear_ratio = 9.0
+node = 2
+gear_ratio = 27.0
 min = -200.0
 max = 200.0
-max_speed = 90.0
+max_speed = 60.0
 tolerance = 3.0
 
 [[joint]]
 name = "elbow"               # J3
 motor = "eagle_8308"
-nodes = [4]
-gear_ratio = 9.0
+node = 3
+gear_ratio = 27.0
 min = -236.0
 max = 0.0
-max_speed = 90.0
+max_speed = 60.0
 tolerance = 3.0
 
 [[joint]]
 name = "gripper"             # 8-tooth module-1.4 pinion: pi * 1.4 * 8 = 35.19 mm per turn.
 motor = "gm5208"
-nodes = [7]
+node = 6
 mm_per_turn = 35.186
 min = -3.5
 max = 25.7
@@ -120,7 +128,7 @@ tolerance = 1.0
 # Motors turning together twist the wrist; turning apart bends it.
 [[differential]]
 motor = "gb36"
-nodes = [5, 6]
+nodes = [4, 5]
 gear_ratio = 12.96
 bend = { name = "wrist_bend", min = -138.9, max = 138.9, max_speed = 120.0, tolerance = 3.0 }
 twist = { name = "wrist_twist", min = -277.8, max = 277.8, max_speed = 120.0, tolerance = 3.0 }

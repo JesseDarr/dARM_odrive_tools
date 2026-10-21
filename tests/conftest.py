@@ -17,11 +17,22 @@ from darm.odrive.bus import CanBus
 from darm.sim import SimNetwork
 
 REPO = Path(__file__).resolve().parents[1]
+ROBOT = cfg.load(REPO / "darm.toml")
+
+
+def node_of(joint: str) -> int:
+    """The node driving a joint (the first of the two, for a differential). Tests never hard-code node ids."""
+    return next(drive.nodes[0] for drive in ROBOT.drives if joint in {j.name for j in drive.joints})
+
+
+def motor_turns(joint: str, value: float) -> float:
+    """Where a direct-drive joint's motor sits, in turns, when the joint is at value."""
+    return ROBOT.drive_for_node(node_of(joint)).turns_per_unit * value
 
 
 @pytest.fixture(scope="session")
 def config() -> cfg.RobotConfig:
-    return cfg.load(REPO / "darm.toml")
+    return ROBOT
 
 
 @pytest.fixture

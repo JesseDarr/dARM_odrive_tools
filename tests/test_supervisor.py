@@ -20,6 +20,7 @@ from darm.odrive.protocol import (
     ProcedureResult,
     Temperature,
 )
+from tests.conftest import motor_turns, node_of
 
 NOW = 1000.0
 
@@ -127,19 +128,14 @@ def test_an_8308_held_near_its_current_limit_is_straining(h: Harness) -> None:
 
 
 def test_gimbal_motors_are_not_strain_checked(h: Harness) -> None:
-    h.nodes[7].iq = Stamped(Iq(3.0, 3.0), NOW)
+    h.nodes[node_of("gripper")].iq = Stamped(Iq(3.0, 3.0), NOW)
     h.check()
     assert h.later(1.0) == []
 
 
 def test_a_joint_outside_its_limits_is_reported_in_joint_units(h: Harness) -> None:
-    h.nodes[4].encoder = Stamped(EncoderEstimates(9.0 * 10 / 360, 0.0), NOW)  # elbow +10 deg, max is 0
+    h.nodes[node_of("elbow")].encoder = Stamped(EncoderEstimates(motor_turns("elbow", 10.0), 0.0), NOW)
     assert h.check() == ["elbow: at 10.0 deg, outside -236..0"]
-
-
-def test_ganged_motors_that_disagree_point_at_a_mechanical_failure(h: Harness) -> None:
-    h.nodes[2].encoder = Stamped(EncoderEstimates(0.25, 0.0), NOW)  # Shoulder motor B alone moved 10 deg.
-    assert h.check() == ["shoulder: ganged motors disagree by 10.0 deg (slipped gear or broken part?)"]
 
 
 def test_a_settled_joint_that_never_arrived_is_blocked(h: Harness) -> None:

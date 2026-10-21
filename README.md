@@ -1,9 +1,12 @@
 # dARM ODrive tools
 
-Supervised CAN control and commissioning for robot arms built on ODrive S1 controllers.
-Written for [dARM](https://github.com/JesseDarr/dARM). Everything specific to that arm (joints,
-gear ratios, limits, node ids, motor tuning) lives in one file, [`darm.toml`](darm.toml), so the
-same code drives the next arm with a new description and no code changes.
+Supervised CAN control and commissioning for robot arms built on ODrive S1 controllers, aimed at
+**dARM2**: a metal, CNC-machined arm with 27:1 cycloidal drives. (The original 3D-printed
+[dARM](https://github.com/JesseDarr/dARM) is retired.)
+
+Everything specific to the arm (joints, gear ratios, limits, node ids, motor tuning) lives in one
+file, [`darm.toml`](darm.toml). The code knows about joints, transmissions and ODrives in general,
+and nothing about any one arm.
 
 ```
 darm monitor      live telemetry, read-only
@@ -20,6 +23,23 @@ darm exercise     sweep a joint through its range (spreads grease)
 
 Every tool runs against simulated ODrives with `darm --sim <tool>`.
 
+## Before you flash
+
+Flashing an ODrive erases its configuration, its calibration **and its node id**. A freshly
+flashed ODrive sits silent on the bus until it is addressed again. Bring boards up in this order:
+
+1. **Back up** boards that already hold a configuration (say, the old dARM's):
+   `darm backup --firmware 0.6.10`
+2. **Flash 0.6.12-1** to every ODrive. Not plain 0.6.12, which drops CAN frames under load.
+3. `darm address`: blinks each ODrive's LED in turn, asks which node it is, and assigns the id
+   by serial number.
+4. `darm configure`: writes `darm.toml`'s settings, reads each one back, and saves.
+   `--dry-run` shows what would change.
+5. With the arm **docked and unloaded**: `darm calibrate 0 1 2 3 4 5 6`. Calibrating a loaded
+   joint corrupts the encoder offset, which shows up later as spinout errors. Results are saved
+   only when calibration succeeds.
+6. `darm home`, then `darm monitor` to check every node and joint before moving anything.
+
 ## Safety model
 
 The arm has no brakes. A motor that stops being driven lets its joint fall. Everything here
@@ -27,10 +47,11 @@ follows from that.
 
 - **Nothing moves except through the arm.** Interfaces only say where they want a joint to be.
   The arm clamps that to the joint's limits, slews toward it no faster than the joint's
-  `max_speed`, and sends a setpoint only when it changes.
+  `max_speed`, and sends a setpoint only when it changes. Held keys and sticks can't run a
+  target more than a quarter second of travel ahead of the joint.
 - **Everything is watched, 50 times a second.** Heartbeats, encoder freshness, ODrive errors,
-  closed-loop state, FET temperature, bus voltage, current strain on the 8308s, joint limits,
-  the two shoulder motors agreeing with each other, and joints that stop short of their target.
+  closed-loop state, FET temperature, bus voltage, current strain on the big motors, joint
+  limits, and joints that stop short of their target.
 - **Any problem freezes the arm.** Each joint brakes at its ODrive's own deceleration limit and
   holds there, powered. Nothing ever goes limp on its own. The fault stays latched, with the
   reason on screen, until you clear it, and clearing re-checks everything first.
@@ -66,23 +87,6 @@ Quitting a tool (`q`, Esc, Ctrl-C) leaves the arm **holding** its position. Use 
 `scripts/reset_interfaces.sh` restarts CAN and Bluetooth without a reboot, then prints the bus
 statistics. A climbing `rx_over_errors` count means the MCP2515 is dropping frames.
 
-## Commissioning, or moving to new firmware
-
-Flashing an ODrive erases its configuration, its calibration **and its node id**. A freshly
-flashed ODrive sits silent on the bus until it is addressed again. The full sequence:
-
-1. **Before flashing**, back up what is there:
-   `darm backup --firmware 0.6.10`
-2. Flash **0.6.12-1** to every ODrive (not plain 0.6.12, which drops CAN frames under load).
-3. `darm address`: blinks each ODrive's LED in turn, asks which node it is, and assigns the id
-   by serial number.
-4. `darm configure`: writes `darm.toml`'s settings, verifies each one by reading it back, and
-   saves. `--dry-run` shows what would change.
-5. With the arm **docked and unloaded**, run `darm calibrate 0 1 2 3 4 5 6 7`. Calibrating a
-   loaded joint corrupts the encoder offset, which shows up later as spinout errors. Results
-   are saved only when calibration succeeds.
-6. `darm home`, then `darm monitor` to check every node and joint before moving anything.
-
 ## Driving the arm
 
 | Tool | Keys |
@@ -100,15 +104,24 @@ arm.
 impossible limits, a joint missing from the park order and settings the firmware can't accept
 are all errors before anything talks to the bus.
 
+**The current file is a placeholder.** dARM2's hardware is still being designed, so it carries
+over the original dARM's joint layout, motors and tuning with dARM2's 27:1 reduction on the four
+primary joints. Replace values as real parts get built and measured.
+
 | Section | What it holds |
 | --- | --- |
 | `firmware` | The exact ODrive firmware every node must run |
 | `[telemetry]` | What each ODrive broadcasts, and how often. The host listens; it never polls |
 | `[safety]` | Timeouts and thresholds that freeze the arm |
 | `[park]` | The order joints fold into the dock |
-| `[[joint]]` / `[[differential]]` | Nodes, gear ratios, limits, speeds and tolerances, in degrees or mm at the joint |
+| `[[joint]]` | One motor driving one joint: its `node`, gear ratio (or mm per turn), limits, speed and tolerance |
+| `[[differential]]` | Two motors driving two joints together (the wrist's bend and twist) |
 | `[gamepad]` | Dead-man, shift and stick bindings |
 | `[odrive]` / `[motors.*]` | Endpoint values `darm configure` writes, by firmware endpoint path |
+
+Joint positions are in degrees at the joint's output (millimetres for the gripper), never motor
+turns. Keep each joint's `max_speed` under its ODrive's trajectory speed divided by the gear ratio,
+or the ODrive falls behind the host.
 
 ## Architecture
 
@@ -117,7 +130,7 @@ graph TD
     apps["darm.apps: one module per tool"] --> arm["darm.arm.Arm: clamp, slew, send on change"]
     arm --> supervisor["Supervisor: every check, every tick"]
     arm --> drives["Drives: joint units ↔ motor turns"]
-    arm --> nodes["ODriveNode ×8: telemetry snapshots, commands, SDO"]
+    arm --> nodes["ODriveNode, one per motor: telemetry snapshots, commands, SDO"]
     supervisor --> nodes
     nodes --> bus["CanBus: one socket, one reader thread"]
     bus --> can0(("can0"))
@@ -128,8 +141,9 @@ graph TD
 - **`odrive.node`**: the latest telemetry as immutable snapshots, so readers never need a lock.
   Endpoint replies are matched on endpoint id and size, so a late write acknowledgement is never
   mistaken for the answer to a read.
-- **`arm`**: joints, transmissions (the ganged shoulder and the differential wrist), the
-  supervisor, the dock journal, and the control loop.
+- **`odrive.addressing`**: finding ODrives by serial number and giving them node ids.
+- **`arm`**: joints, transmissions (direct and differential), the supervisor, the dock journal,
+  and the control loop.
 - **`sim`**: a simulated ODrive network on a python-can virtual bus. The tests and `--sim` use it.
 
 ## Development
@@ -146,17 +160,16 @@ darm --sim console     # any tool, against simulated ODrives
 
 ## Known gaps
 
-The simulator is faithful to the protocol, not to physics. These still need checking on the
-real arm:
+The simulator is faithful to the protocol, not to physics. These still need checking on real
+hardware:
 
-- **Hardware behaviour.** Everything was tested against simulated ODrives. Commissioning in
-  particular (`address`, `configure`, `calibrate`) has not yet met real firmware 0.6.12-1.
+- **Nothing has run on hardware yet.** Commissioning in particular (`address`, `configure`,
+  `calibrate`) has not met real firmware 0.6.12-1.
+- **`darm.toml` is a placeholder** until dARM2's joints, motors, limits, gains and park order
+  are known. The motor gains were tuned for dARM's 9:1 planetaries, not 27:1 cycloidals.
 - **Spinout detection is off** (±9999 W thresholds, carried over). Recalibrating unloaded on
   0.6.12-1 may allow real thresholds.
-- **Gimbal `phase_resistance`** must be line-to-neutral (half of line-to-line). Measure the
-  GB36 and GM5208 and correct `darm.toml`: these motors run voltage-mode, so torque is only as
-  good as this number.
-- **The two shoulder motors run independent position loops** on one shaft. Both integrators
-  can wind up against each other. Watch their Iq in `darm monitor` while holding a pose.
+- **Gimbal `phase_resistance`** must be line-to-neutral (half of line-to-line). These motors run
+  voltage-mode, so torque is only as good as this number. Measure each motor.
 - **The MCP2515 HAT has two receive buffers.** If `rx_over_errors` climbs, lower the telemetry
   rates or move to an MCP2518FD HAT or a gs_usb adapter.

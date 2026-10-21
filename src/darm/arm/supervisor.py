@@ -79,13 +79,6 @@ class Supervisor:
             if commanded is not None and joint.name in commanded:
                 yield from self._check_tracking(joint, value, commanded[joint.name], settled, now)
 
-        spread = drive.disagreement(motor_turns)
-        if spread > drive.joints[0].tolerance:
-            yield (
-                f"{drive.joints[0].name}: ganged motors disagree by {spread:.1f} {drive.joints[0].unit}"
-                " (slipped gear or broken part?)"
-            )
-
     def _check_limits(self, joint: JointSpec, value: float) -> Iterator[str]:
         if not joint.min - joint.tolerance <= value <= joint.max + joint.tolerance:
             yield f"{joint.name}: at {value:.1f} {joint.unit}, outside {joint.min:g}..{joint.max:g}"

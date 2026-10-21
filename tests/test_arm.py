@@ -12,22 +12,21 @@ import pytest
 from darm.arm.arm import ArmState, MotionError, StartupError
 from darm.odrive.protocol import ODriveError
 from darm.sim import SimNetwork, place
-from tests.conftest import Rig, eventually
+from tests.conftest import ROBOT, Rig, eventually, motor_turns, node_of
 
 RigFactory = Callable[..., Rig]
 
-DEG_PER_8308_TURN = 360.0 / 9.0
 
-
-def turns(degrees: float) -> float:
-    return degrees / DEG_PER_8308_TURN
+def at(**joints: float) -> dict[int, float]:
+    """Motor positions that put direct-drive joints where named: at(elbow=-45.0)."""
+    return {node_of(joint): motor_turns(joint, value) for joint, value in joints.items()}
 
 
 # ------------------------------------------------------------------------------ taking control
 
 
 def test_engaging_holds_every_joint_exactly_where_it_is(make_rig: RigFactory) -> None:
-    rig = make_rig(lambda sim: place(sim, {4: turns(-45.0)}))
+    rig = make_rig(lambda sim: place(sim, at(elbow=-45.0)))
     rig.arm.engage()
     assert rig.arm.state is ArmState.ARMED
     time.sleep(0.3)
@@ -37,7 +36,7 @@ def test_engaging_holds_every_joint_exactly_where_it_is(make_rig: RigFactory) ->
 
 
 def test_missing_nodes_disable_only_their_joints(make_rig: RigFactory) -> None:
-    rig = make_rig(node_ids=(0, 1, 2, 3, 4, 5, 6))
+    rig = make_rig(node_ids=tuple(n for n in ROBOT.node_ids if n != node_of("gripper")))
     assert "gripper" not in rig.arm.joint_names
     rig.arm.engage()
     assert rig.arm.state is ArmState.ARMED
@@ -48,7 +47,7 @@ def test_missing_nodes_disable_only_their_joints(make_rig: RigFactory) -> None:
     [
         (lambda sim: setattr(sim.nodes[3], "firmware", (0, 6, 10)), "node 3 runs 0.6.10"),
         (lambda sim: sim.nodes[2].fault(ODriveError.DRV_FAULT), "node 2: DRV_FAULT"),
-        (lambda sim: place(sim, {4: turns(30.0)}), "elbow: at 30.0 deg"),
+        (lambda sim: place(sim, at(elbow=30.0)), "elbow: at 30.0 deg"),
         (lambda sim: _set_float(sim, 0, "axis0.config.init_pos", 1.5), "init_pos is 1.5"),
         (lambda sim: _set_bool(sim, 6, "axis0.config.enable_watchdog", True), "watchdog is on"),
     ],
@@ -70,7 +69,7 @@ def test_engaging_refuses_after_a_power_cycle_away_from_the_dock(make_rig: RigFa
 
 
 def test_a_script_restart_mid_pose_is_not_mistaken_for_a_power_cycle(make_rig: RigFactory) -> None:
-    rig = make_rig(lambda sim: place(sim, {4: turns(-45.0)}))
+    rig = make_rig(lambda sim: place(sim, at(elbow=-45.0)))
     rig.journal.mark_away()
     rig.arm.engage()
     assert rig.arm.state is ArmState.ARMED
@@ -92,7 +91,7 @@ def test_nudges_never_run_far_ahead_of_the_joint(make_rig: RigFactory) -> None:
     rig.arm.engage()
     for _ in range(50):
         rig.arm.nudge("base", 10.0)
-    assert rig.arm.targets()["base"] <= 90.0 * 0.25 + 1.0
+    assert rig.arm.targets()["base"] <= ROBOT.joints["base"].max_speed * 0.25 + 1.0
 
 
 def test_a_nudge_never_pulls_a_target_back_against_its_direction(make_rig: RigFactory) -> None:
@@ -115,7 +114,7 @@ def test_motion_is_slewed_at_the_joint_speed_limit(make_rig: RigFactory) -> None
     rig.arm.set_target("upper_arm", 180.0)
     time.sleep(0.5)
     position = rig.arm.measured()["upper_arm"]
-    assert 0.0 < position <= 90.0 * 0.5 + 5.0
+    assert 0.0 < position <= ROBOT.joints["upper_arm"].max_speed * 0.5 + 5.0
 
 
 def test_move_to_blocks_until_every_joint_has_settled(make_rig: RigFactory) -> None:
@@ -136,9 +135,9 @@ def test_a_silent_node_freezes_everything_else_where_it_stands(make_rig: RigFact
     rig.arm.set_target("base", 90.0)
     time.sleep(0.3)
     with rig.sim.locked():
-        rig.sim.nodes[7].silent = True
+        rig.sim.nodes[node_of("gripper")].silent = True
     assert eventually(lambda: rig.arm.state is ArmState.FROZEN)
-    assert "node 7" in str(rig.arm.fault)
+    assert f"node {node_of('gripper')}" in str(rig.arm.fault)
     stop = rig.arm.targets()["base"]
     time.sleep(1.0)
     assert rig.arm.measured()["base"] == pytest.approx(stop, abs=0.5)
@@ -169,29 +168,20 @@ def test_a_blocked_joint_freezes_the_arm(make_rig: RigFactory) -> None:
     rig = make_rig()
     rig.arm.engage()
     with rig.sim.locked():
-        rig.sim.nodes[4].blocked = True
+        rig.sim.nodes[node_of("elbow")].blocked = True
     rig.arm.set_target("elbow", -20.0)
     assert eventually(lambda: rig.arm.state is ArmState.FROZEN, timeout=3.0)
     assert "elbow: stuck" in str(rig.arm.fault)
-
-
-def test_ganged_motors_slipping_apart_freezes_the_arm(make_rig: RigFactory) -> None:
-    rig = make_rig()
-    rig.arm.engage()
-    with rig.sim.locked():
-        rig.sim.nodes[2].teleport(0.5)
-    assert eventually(lambda: rig.arm.state is ArmState.FROZEN)
-    assert "disagree" in str(rig.arm.fault)
 
 
 def test_clearing_a_fault_rearms_and_holds_where_it_is(make_rig: RigFactory) -> None:
     rig = make_rig()
     rig.arm.engage()
     with rig.sim.locked():
-        rig.sim.nodes[3].fault(ODriveError.DRV_FAULT)
+        rig.sim.nodes[node_of("upper_arm")].fault(ODriveError.DRV_FAULT)
     assert eventually(lambda: rig.arm.state is ArmState.FROZEN)
     with rig.sim.locked():
-        rig.sim.nodes[3].teleport(turns(-10.0))  # It sagged while disarmed.
+        rig.sim.nodes[node_of("upper_arm")].teleport(motor_turns("upper_arm", -10.0))  # It sagged while disarmed.
     rig.arm.clear_fault()
     assert rig.arm.state is ArmState.ARMED
     assert rig.arm.targets()["upper_arm"] == pytest.approx(-10.0)
@@ -212,7 +202,7 @@ def test_a_fault_that_persists_cannot_be_cleared(make_rig: RigFactory) -> None:
 
 
 def test_parking_folds_stage_by_stage_then_releases_and_remembers(make_rig: RigFactory) -> None:
-    rig = make_rig(lambda sim: place(sim, {0: turns(30.0), 4: turns(-60.0), 7: 0.3}))
+    rig = make_rig(lambda sim: place(sim, at(base=30.0, elbow=-60.0, gripper=10.0)))
     rig.arm.engage()
     stages: list[str] = []
     rig.arm.park(progress=stages.append)
@@ -229,17 +219,17 @@ def test_parking_folds_stage_by_stage_then_releases_and_remembers(make_rig: RigF
 
 
 def test_parking_stops_at_the_first_fault(make_rig: RigFactory) -> None:
-    rig = make_rig(lambda sim: place(sim, {4: turns(-60.0)}))
+    rig = make_rig(lambda sim: place(sim, at(elbow=-60.0)))
     rig.arm.engage()
     with rig.sim.locked():
-        rig.sim.nodes[4].blocked = True
+        rig.sim.nodes[node_of("elbow")].blocked = True
     with pytest.raises(MotionError, match="frozen"):
         rig.arm.park()
     assert rig.arm.state is ArmState.FROZEN
 
 
 def test_releasing_away_from_the_dock_is_refused(make_rig: RigFactory) -> None:
-    rig = make_rig(lambda sim: place(sim, {4: turns(-60.0)}))
+    rig = make_rig(lambda sim: place(sim, at(elbow=-60.0)))
     rig.arm.engage()
     with pytest.raises(MotionError, match=re.escape("not docked: elbow -60.0 deg")):
         rig.arm.release()

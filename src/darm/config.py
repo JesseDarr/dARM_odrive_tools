@@ -70,14 +70,13 @@ class JointSpec:
 class DriveSpec:
     """How motors become joint motion.
 
-    direct:       one joint driven by one or more motors in lockstep.
-    differential: two motors driving two joints (bend, twist).
+    direct:       one motor drives one joint.
+    differential: two motors drive two joints together (bend, twist).
     """
 
     kind: DriveKind
     motor: str
     nodes: tuple[int, ...]
-    signs: tuple[int, ...]
     turns_per_unit: float  # motor turns per joint unit
     joints: tuple[JointSpec, ...]  # differential: (bend, twist)
 
@@ -149,7 +148,7 @@ class RobotConfig:
         return next(drive for drive in self.drives if node_id in drive.nodes)
 
     def node_labels(self) -> dict[int, str]:
-        """What each node drives: 'base', 'shoulder A' / 'shoulder B', 'wrist A' / 'wrist B'."""
+        """What each node drives: 'base', 'elbow', and 'wrist A' / 'wrist B' for a differential's two motors."""
         labels = {}
         for drive in self.drives:
             name = _shared_prefix([joint.name for joint in drive.joints])
@@ -312,13 +311,11 @@ def _parse_park(s: _Section) -> ParkSpec:
 
 def _parse_joint(s: _Section) -> DriveSpec:
     name = s.get("name", str)
-    nodes = _node_ids(s.get("nodes", list), name)
-    signs = tuple(s.get("signs", list, [1] * len(nodes)))
+    node = _node_ids([s.get("node", int)], name)
     unit, turns_per_unit = _scale(s, name)
     joint = _joint_limits(s, name, unit)
-    drive = DriveSpec("direct", s.get("motor", str), nodes, signs, turns_per_unit, (joint,))
+    drive = DriveSpec("direct", s.get("motor", str), node, turns_per_unit, (joint,))
     s.done()
-    _check_signs(drive)
     return drive
 
 
@@ -329,7 +326,7 @@ def _parse_differential(s: _Section) -> DriveSpec:
     ratio = _positive(s.get("gear_ratio", float), "differential.gear_ratio")
     bend = _joint_limits(s.section("bend"), None, "deg")
     twist = _joint_limits(s.section("twist"), None, "deg")
-    drive = DriveSpec("differential", s.get("motor", str), nodes, (1, 1), ratio / _DEGREES_PER_TURN, (bend, twist))
+    drive = DriveSpec("differential", s.get("motor", str), nodes, ratio / _DEGREES_PER_TURN, (bend, twist))
     s.done()
     return drive
 
@@ -432,14 +429,9 @@ def _check_consistency(config: RobotConfig) -> None:
     _require_known([b.joint for b in config.gamepad.bindings], names, "gamepad bindings")
 
 
-def _check_signs(drive: DriveSpec) -> None:
-    if len(drive.signs) != len(drive.nodes) or any(sign not in (1, -1) for sign in drive.signs):
-        raise ConfigError(f"joint '{drive.joints[0].name}': signs must be one +1/-1 per node")
-
-
 def _node_ids(values: list[Any], where: str) -> tuple[int, ...]:
-    if not values or not all(isinstance(n, int) and 0 <= n <= MAX_NODE_ID for n in values):
-        raise ConfigError(f"{where}: nodes must be a non-empty list of ids in 0..{MAX_NODE_ID}")
+    if not values or not all(isinstance(n, int) and not isinstance(n, bool) and 0 <= n <= MAX_NODE_ID for n in values):
+        raise ConfigError(f"{where}: node ids must be in 0..{MAX_NODE_ID}")
     return tuple(values)
 
 
