@@ -33,7 +33,7 @@ from darm.odrive.protocol import AxisState, ControlMode, InputMode, describe_err
 log = logging.getLogger(__name__)
 
 _ARM_TIMEOUT_S = 2.0
-_PARK_POLL_S = 0.02
+_ARRIVAL_POLL_S = 0.02
 _DISCOVERY_MIN_S = 0.5
 
 
@@ -47,8 +47,8 @@ class StartupError(RuntimeError):
     pass
 
 
-class ParkError(RuntimeError):
-    pass
+class MotionError(RuntimeError):
+    """A requested motion could not complete: the arm froze, timed out, or was not armed."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,27 +115,34 @@ class Arm:
         self._start_loop()
 
     def park(self, progress: Callable[[str], None] = log.info) -> None:
-        """Fold into the dock one stage at a time, then let go. Blocks. Raises ParkError if anything objects."""
+        """Fold into the dock one stage at a time, then let go. Blocks. Raises MotionError if anything objects."""
         active = set(self.joint_names)
         for stage in self.config.park.stages:
             joints = [name for name in stage if name in active]
-            if not joints:
-                continue
-            progress(f"parking {', '.join(joints)}")
-            with self._lock:
-                self._require(ArmState.ARMED, "park")
-                for name in joints:
-                    self._desired[name] = 0.0
-            self._await_arrival(joints)
+            if joints:
+                progress(f"parking {', '.join(joints)}")
+                self.move_to(dict.fromkeys(joints, 0.0), self.config.park.stage_timeout_s)
         progress("docked; releasing motors")
         self.release()
+
+    def move_to(self, targets: Mapping[str, float], timeout: float) -> None:
+        """Steer joints to targets (clamped to limits) and block until every one has settled there.
+
+        Raises MotionError if the arm is not armed, freezes on the way, or has not arrived
+        within timeout seconds, in which case it freezes the arm first.
+        """
+        with self._lock:
+            self._require(ArmState.ARMED, "move")
+            for name, value in targets.items():
+                self._desired[name] = self.joint(name).clamp(value)
+        self._await_arrival(list(targets), timeout)
 
     def release(self, require_docked: bool = True) -> None:
         """Stop driving the motors. Without brakes the arm then falls, so by default only from the dock."""
         docked = self._is_docked()
         if require_docked and not docked:
             off_dock = {n: v for n, v in self.measured().items() if not abs(v) <= self.joint(n).tolerance}
-            raise ParkError(f"not docked: {_format_joints(off_dock, self.joints)}")
+            raise MotionError(f"not docked: {_format_joints(off_dock, self.joints)}")
         self._stop_loop()
         for node in self._active_nodes():
             node.request_state(AxisState.IDLE)
@@ -409,21 +416,20 @@ class Arm:
 
     # ================================================================ helpers
 
-    def _await_arrival(self, joints: list[str]) -> None:
-        deadline = time.monotonic() + self.config.park.stage_timeout_s
+    def _await_arrival(self, joints: list[str], timeout: float) -> None:
+        deadline = time.monotonic() + timeout
         while True:
             with self._lock:
-                self._require(ArmState.ARMED, "park")
+                self._require(ArmState.ARMED, "move")
                 arrived = all(self._commanded[name] == self._desired[name] for name in joints)
             measured = self.measured()
             close = all(abs(measured[n] - self._desired[n]) <= self.joint(n).tolerance for n in joints)
             if arrived and close and self._trajectories_done(joints):
                 return
             if time.monotonic() > deadline:
-                timeout = self.config.park.stage_timeout_s
-                self.freeze(f"park: {', '.join(joints)} did not reach the dock in {timeout:g} s")
-                self._require(ArmState.ARMED, "park")
-            time.sleep(_PARK_POLL_S)
+                self.freeze(f"{', '.join(joints)} did not reach target within {timeout:g} s")
+                self._require(ArmState.ARMED, "move")
+            time.sleep(_ARRIVAL_POLL_S)
 
     def _is_docked(self) -> bool:
         return all(abs(value) <= self.joint(name).tolerance for name, value in self.measured().items())
@@ -436,7 +442,7 @@ class Arm:
     def _require(self, state: ArmState, action: str) -> None:
         if self._state is not state:
             reason = f": {self._fault}" if self._fault else ""
-            raise ParkError(f"cannot {action} while {self._state.value}{reason}")
+            raise MotionError(f"cannot {action} while {self._state.value}{reason}")
 
     def _make_supervisor(self, drives: list[Drive]) -> Supervisor:
         limits = {n: limit for n in self.nodes if (limit := self.config.current_limit(n)) is not None}

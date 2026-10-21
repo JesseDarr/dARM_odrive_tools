@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from darm import apps
-from darm.arm.arm import Arm, ParkError, StartupError
+from darm.arm.arm import Arm, MotionError, StartupError
 from darm.arm.journal import Journal
 from darm.config import ConfigError, RobotConfig, load
 from darm.odrive.bus import BusError, CanBus
@@ -33,7 +33,7 @@ from darm.sim import SimNetwork
 log = logging.getLogger("darm")
 
 _SIM_CHANNEL = "darm-sim"
-_EXPECTED_FAILURES = (ConfigError, StartupError, ParkError, BusError, SdoTimeoutError)
+_EXPECTED_FAILURES = (ConfigError, StartupError, MotionError, BusError, SdoTimeoutError)
 
 
 @dataclass(frozen=True)
