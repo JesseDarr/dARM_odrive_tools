@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# One-time Pi setup: the CAN bus at boot, then darm in its own virtualenv.
+# One-time Pi setup: the CAN bus at boot, then darm's Python dependencies in a
+# virtualenv. darm itself is never installed: it runs from this checkout (./darm).
 # Assumes the CAN HAT overlay is already in /boot/firmware/config.txt (see README).
 set -euo pipefail
 
@@ -15,11 +16,11 @@ sudo install -m 644 "${repo}/scripts/can0.service" /etc/systemd/system/can0.serv
 sudo systemctl daemon-reload
 sudo systemctl enable --now can0.service
 
-echo "Installing darm into ${repo}/.venv..."
+echo "Installing Python dependencies into ${repo}/.venv..."
 python3 -m venv "${repo}/.venv"
 "${repo}/.venv/bin/pip" install --quiet --upgrade pip
-"${repo}/.venv/bin/pip" install --quiet -e "${repo}[gamepad]"
+"${repo}/.venv/bin/pip" install --quiet -r "${repo}/requirements.txt"
 
 echo
 echo "Done. Activate with:  source ${repo}/.venv/bin/activate"
-echo "Then try:             darm monitor"
+echo "Then try:             ${repo}/darm monitor"

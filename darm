@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+"""Run any darm tool straight from this checkout. Nothing to install.
+
+    ./darm --help            Linux / the Pi
+    python darm --help       Windows, or anywhere the shebang doesn't apply
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
+from darm.cli import main  # After the line above: the package lives in src/.
+
+sys.exit(main())

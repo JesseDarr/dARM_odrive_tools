@@ -23,14 +23,13 @@ darm exercise     sweep a joint through its range (spreads grease)
 
 ## Running it
 
-`darm` is an ordinary command once the package is installed in a virtual environment. No
-shebang, no `python` in front: pip reads `[project.scripts]` in `pyproject.toml` and writes a
-small launcher that runs `darm.cli:main` with the venv's own Python. On Linux that is
-`.venv/bin/darm`, on Windows `.venv\Scripts\darm.exe`. Activating the venv puts it on your PATH.
+Nothing to install. `darm` at the repo root is a Python script with a `#!/usr/bin/env python3`
+shebang that runs the tools straight from this checkout. Python 3.10 or newer, plus the
+libraries in `requirements.txt`:
 
 ```bash
 # On the Pi, once (after enabling the CAN HAT, see "Setting up the Pi"):
-scripts/setup_pi.sh
+scripts/setup_pi.sh               # can0 at boot, plus the libraries in .venv
 source .venv/bin/activate
 ```
 
@@ -38,22 +37,21 @@ source .venv/bin/activate
 # Anywhere else, e.g. to try every tool against simulated ODrives:
 python -m venv .venv
 .venv\Scripts\Activate.ps1        # bash: source .venv/bin/activate
-pip install -e ".[gamepad]"       # -e: edits to the code take effect without reinstalling
+pip install -r requirements.txt
 ```
 
 Then:
 
 ```
-darm --help                  every tool, one line each
-darm calibrate --help        one tool: what it does, why, and its options
-darm --sim console           any tool against simulated ODrives instead of the CAN bus
-python -m darm --help        the same, without the launcher
-.venv/bin/darm --help        the same, without activating the venv
+./darm --help                every tool, one line each
+./darm calibrate --help      one tool: what it does, why, and its options
+./darm --sim console         any tool against simulated ODrives instead of the CAN bus
+python darm --help           Windows, or anywhere the shebang doesn't apply
 ```
 
-Tools read `./darm.toml`, so run them from the repo directory, or point `--config` or
-`$DARM_CONFIG` at the file. `monitor`, `console` and `gamepad` take over the whole terminal, so
-run them in a real terminal window.
+Tools use this repo's `darm.toml` from any directory; `--config` or `$DARM_CONFIG` points them at
+another. `monitor`, `console` and `gamepad` take over the whole terminal, so run them in a real
+terminal window. The examples in the rest of this README write `darm` for `./darm`.
 
 ## Before you flash
 
@@ -111,9 +109,9 @@ Quitting a tool (`q`, Esc, Ctrl-C) leaves the arm **holding** its position. Use 
    ```
    `dmesg | grep -i mcp251` should show the controller.
 2. Clone this repo and run `scripts/setup_pi.sh`. It installs a service that brings `can0` up at
-   boot (1 Mbit/s, automatic bus-off recovery, a 256-frame transmit queue) and installs `darm`
-   into `.venv`.
-3. `source .venv/bin/activate`, then `darm monitor`. See [Running it](#running-it).
+   boot (1 Mbit/s, automatic bus-off recovery, a 256-frame transmit queue) and puts the Python
+   libraries darm needs into `.venv`.
+3. `source .venv/bin/activate`, then `./darm monitor`. See [Running it](#running-it).
 
 `scripts/reset_interfaces.sh` restarts CAN and Bluetooth without a reboot, then prints the bus
 statistics. A climbing `rx_over_errors` count means the MCP2515 is dropping frames.
@@ -181,13 +179,15 @@ graph TD
 
 ```powershell
 python -m venv .venv; .venv\Scripts\activate      # or: source .venv/bin/activate
-pip install -e ".[gamepad,dev]"
+pip install -r requirements-dev.txt
 pytest                 # the full suite runs against simulated ODrives, no hardware needed
 ruff check src tests
 ruff format --check src tests
 mypy                   # strict
-darm --sim console     # any tool, against simulated ODrives
+python darm --sim console
 ```
+
+`pyproject.toml` holds only these tools' settings. There is no package to build.
 
 ## Known gaps
 

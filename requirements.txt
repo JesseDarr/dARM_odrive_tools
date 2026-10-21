@@ -1,0 +1,5 @@
+# What darm needs to run. Python 3.10 or newer.
+python-can>=4.3
+urwid>=2.1
+pygame>=2.1                          # Only `darm gamepad` uses it.
+tomli>=2.0; python_version < "3.11"  # Python 3.11+ reads TOML on its own.

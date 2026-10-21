@@ -1,4 +1,8 @@
-"""darm: one command, every tool. `darm --help` lists them.
+"""darm: one command, every tool. `./darm --help` lists them.
+
+darm is never installed. It runs from this checkout through the `darm` launcher
+at the repo root, so everything it needs (darm.toml, the firmware endpoint
+tables) is found relative to this file.
 
 Each tool is a module in darm.apps exposing:
 
@@ -16,7 +20,6 @@ import importlib
 import logging
 import os
 import pkgutil
-import sys
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -33,6 +36,7 @@ from darm.sim import SimNetwork
 
 log = logging.getLogger("darm")
 
+_REPO = Path(__file__).resolve().parents[2]
 _SIM_CHANNEL = "darm-sim"
 _EXPECTED_FAILURES = (ConfigError, StartupError, MotionError, BusError, SdoTimeoutError)
 
@@ -84,12 +88,12 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="darm", description="Supervised control and commissioning of the dARM.")
+    parser = argparse.ArgumentParser(prog="darm", description="Supervised control and commissioning of ODrive arms.")
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path(os.environ.get("DARM_CONFIG", "darm.toml")),
-        help="robot description (default: $DARM_CONFIG or ./darm.toml)",
+        default=Path(os.environ.get("DARM_CONFIG", _REPO / "darm.toml")),
+        help="robot description (default: $DARM_CONFIG, else darm.toml in this repo)",
     )
     parser.add_argument("--sim", action="store_true", help="talk to simulated ODrives instead of the CAN bus")
     parser.add_argument(
@@ -113,7 +117,3 @@ def _tools() -> list[ModuleType]:
         if hasattr(module, "register"):
             found.append(module)
     return found
-
-
-if __name__ == "__main__":
-    sys.exit(main())
