@@ -1,14 +1,20 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Kick the CAN bus and Bluetooth back into shape without a reboot.
+# Usage: scripts/reset_interfaces.sh [interface] [bitrate]
+set -euo pipefail
 
-echo "Resetting CAN interface can0..."
-sudo ip link set can0 down
-sudo ip link set can0 up type can bitrate 1000000
-echo ""
+interface="${1:-can0}"
+bitrate="${2:-1000000}"
 
-echo "Restarting bluetooth service..."
+echo "Resetting ${interface} at ${bitrate} bit/s..."
+sudo ip link set "${interface}" down || true
+sudo ip link set "${interface}" up type can bitrate "${bitrate}" restart-ms 100
+sudo ip link set "${interface}" txqueuelen 256
+
+echo "Restarting Bluetooth..."
 sudo systemctl restart bluetooth
-echo ""
-
-echo "Reinitialize udev..."
 sudo udevadm trigger
-echo ""
+
+echo
+echo "CAN status (watch rx_over_errors: nonzero means the HAT is dropping frames):"
+ip -details -statistics link show "${interface}"

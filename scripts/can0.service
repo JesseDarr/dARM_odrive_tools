@@ -1,0 +1,19 @@
+# Brings up the dARM CAN bus at boot. Installed by scripts/setup_pi.sh.
+#
+# restart-ms: recover from bus-off on its own instead of staying deaf until someone notices.
+# txqueuelen: room for a burst of setpoints; the kernel default of 10 frames drops them.
+
+[Unit]
+Description=CAN bus can0 for the dARM ODrives
+BindsTo=sys-subsystem-net-devices-can0.device
+After=sys-subsystem-net-devices-can0.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/sbin/ip link set can0 up type can bitrate 1000000 restart-ms 100
+ExecStartPost=/sbin/ip link set can0 txqueuelen 256
+ExecStop=/sbin/ip link set can0 down
+
+[Install]
+WantedBy=multi-user.target

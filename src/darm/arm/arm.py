@@ -36,6 +36,7 @@ _ARM_TIMEOUT_S = 2.0
 _ARRIVAL_POLL_S = 0.02
 _NUDGE_LEAD_S = 0.25
 _DISCOVERY_MIN_S = 0.5
+_DISCOVERY_POLL_S = 0.01
 
 
 class ArmState(enum.Enum):
@@ -84,10 +85,16 @@ class Arm:
     # ================================================================ lifecycle
 
     def discover(self) -> list[int]:
-        """Listen for heartbeats; enable every joint whose ODrives all answered. Returns missing node ids."""
+        """Listen for heartbeats; enable every joint whose ODrives all answered. Returns missing node ids.
+
+        Returns as soon as every node has reported both its state and its position. Only a
+        missing node costs the full listening window.
+        """
         listen_s = max(_DISCOVERY_MIN_S, 2 * self.config.safety.heartbeat_timeout_s)
-        time.sleep(listen_s)
-        present = {node_id for node_id, node in self.nodes.items() if node.heartbeat is not None}
+        deadline = time.monotonic() + listen_s
+        while not all(_has_reported(node) for node in self.nodes.values()) and time.monotonic() < deadline:
+            time.sleep(_DISCOVERY_POLL_S)
+        present = {node_id for node_id, node in self.nodes.items() if _has_reported(node)}
         self.drives = [drive for drive in self._all_drives if set(drive.nodes) <= present]
         if not self.drives:
             raise StartupError("no ODrives answered. Is the CAN interface up and the power box on?")
@@ -432,7 +439,7 @@ class Arm:
     def _hold_where_measured(self) -> None:
         """Make the measured position the target, so nothing moves until someone asks it to."""
         for drive in self.drives:
-            motor_turns = [self.nodes[n].encoder.value.pos for n in drive.nodes]  # type: ignore[union-attr]
+            motor_turns = [self._position(node_id) for node_id in drive.nodes]
             values = [joint.clamp(v) for joint, v in zip(drive.joints, drive.to_joint(motor_turns), strict=True)]
             for joint, value in zip(drive.joints, values, strict=True):
                 self._desired[joint.name] = self._commanded[joint.name] = value
@@ -456,6 +463,12 @@ class Arm:
                 self._require(ArmState.ARMED, "move")
             time.sleep(_ARRIVAL_POLL_S)
 
+    def _position(self, node_id: int) -> float:
+        frame = self.nodes[node_id].encoder
+        if frame is None:
+            raise StartupError(f"node {node_id}: no position feedback")
+        return frame.value.pos
+
     def _is_docked(self) -> bool:
         return all(abs(value) <= self.joint(name).tolerance for name, value in self.measured().items())
 
@@ -475,6 +488,10 @@ class Arm:
 
     def _active_nodes(self) -> list[ODriveNode]:
         return [self.nodes[node_id] for drive in self.drives for node_id in drive.nodes]
+
+
+def _has_reported(node: ODriveNode) -> bool:
+    return node.heartbeat is not None and node.encoder is not None
 
 
 def _format_joints(values: Mapping[str, float], specs: Mapping[str, JointSpec]) -> str:
