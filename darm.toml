@@ -1,0 +1,265 @@
+# dARM robot description.
+#
+# Everything specific to this arm lives here. The code knows about joints,
+# transmissions, and ODrives in general; it knows nothing about dARM.
+#
+# Units: revolute joints are degrees at the joint output, the gripper is
+# millimetres of finger travel. Zero for every joint is the docked pose.
+
+firmware = "0.6.12-1"        # Must match every ODrive on the bus. Tools refuse to run otherwise.
+                             # (0.6.12 without the -1 drops CAN frames under load. Don't run it.)
+control_rate_hz = 50         # Host control loop: supervisor checks + setpoint updates.
+
+[bus]
+interface = "socketcan"
+channel = "can0"
+bitrate = 1_000_000
+
+# ------------------------------------------------------------------------------ telemetry
+# What each ODrive broadcasts unprompted, in milliseconds (0 = off). The host
+# never polls for these, it listens. Budget: a classic 1 Mbit frame is ~125 µs,
+# and the MCP2515 HAT has two receive buffers, so bursts overrun it long before
+# the bus is full. These rates are ~100 frames/s per node, ~820 frames/s for
+# 8 nodes (~10%). Errors also ride in every heartbeat.
+[telemetry]
+heartbeat_ms = 50
+encoder_ms = 20
+error_ms = 200
+iq_ms = 100
+torques_ms = 200
+bus_voltage_ms = 200
+temperature_ms = 500
+powers_ms = 200
+
+# ------------------------------------------------------------------------------ safety
+# Any violation freezes the arm: every healthy joint decelerates to a stop and
+# holds there, powered, until you clear the fault. Nothing ever goes limp on its
+# own, because limp means the arm falls.
+[safety]
+heartbeat_timeout_ms = 250   # 5 missed heartbeats.
+encoder_timeout_ms = 100     # 10 missed encoder frames.
+max_fet_temp_c = 90.0
+min_bus_voltage = 42.0
+max_bus_voltage = 52.0       # Brake resistors should keep regen under this.
+max_current_fraction = 0.9   # An 8308 held this close to current_soft_max is pushing against something.
+transient_s = 0.5            # How long voltage, strain and tracking faults must persist before they count.
+
+# ------------------------------------------------------------------------------ park
+# Driving to the dock happens one stage at a time, distal joints first, so the
+# arm folds before it swings. Only once every joint is home does anything idle.
+[park]
+stages = [
+    ["gripper", "wrist_bend", "wrist_twist"],
+    ["upper_arm", "elbow"],
+    ["base"],
+    ["shoulder"],
+]
+stage_timeout_s = 20.0
+
+# ------------------------------------------------------------------------------ joints
+# nodes:       ODrive CAN node ids driving this joint.
+# signs:       +1/-1 per node. Ganged motors facing each other get opposite signs.
+# gear_ratio:  Motor turns per joint turn (revolute joints).
+# mm_per_turn: Linear travel per motor turn (linear joints).
+# min / max:   Hard limits in joint units. The host never commands past them.
+# max_speed:   Host-side slew limit in joint units/s, on top of the ODrive's own trajectory limits.
+# tolerance:   How far measured may drift from commanded, from limits, or between ganged motors.
+
+[[joint]]
+name = "base"                # J0
+motor = "eagle_8308"
+nodes = [0]
+gear_ratio = 9.0
+min = -192.0
+max = 192.0
+max_speed = 90.0
+tolerance = 3.0
+
+[[joint]]
+name = "shoulder"            # J1: two actuators on one axis, mounted facing each other.
+motor = "eagle_8308"
+nodes = [1, 2]
+signs = [1, -1]
+gear_ratio = 9.0
+min = -200.0
+max = 0.0
+max_speed = 60.0
+tolerance = 3.0
+
+[[joint]]
+name = "upper_arm"           # J2
+motor = "eagle_8308"
+nodes = [3]
+gear_ratio = 9.0
+min = -200.0
+max = 200.0
+max_speed = 90.0
+tolerance = 3.0
+
+[[joint]]
+name = "elbow"               # J3
+motor = "eagle_8308"
+nodes = [4]
+gear_ratio = 9.0
+min = -236.0
+max = 0.0
+max_speed = 90.0
+tolerance = 3.0
+
+[[joint]]
+name = "gripper"             # 8-tooth module-1.4 pinion: pi * 1.4 * 8 = 35.19 mm per turn.
+motor = "gm5208"
+nodes = [7]
+mm_per_turn = 35.186
+min = -3.5
+max = 25.7
+max_speed = 30.0
+tolerance = 1.0
+
+# Two motors drive a bevel differential through 20:72 x 20:72 belts (12.96:1).
+# Motors turning together twist the wrist; turning apart bends it.
+[[differential]]
+motor = "gb36"
+nodes = [5, 6]
+gear_ratio = 12.96
+bend = { name = "wrist_bend", min = -138.9, max = 138.9, max_speed = 120.0, tolerance = 3.0 }
+twist = { name = "wrist_twist", min = -277.8, max = 277.8, max_speed = 120.0, tolerance = 3.0 }
+
+# ------------------------------------------------------------------------------ gamepad
+# Nothing moves unless the dead-man button is held. Holding shift as well
+# moves the left stick from base/shoulder over to the wrist.
+# speed: joint units/s at full deflection; negative inverts the axis.
+# Triggers rest at -1 under SDL; trigger = true maps rest..full to 0..1.
+[gamepad]
+deadman_button = 4           # LB
+shift_button = 5             # RB
+dead_zone = 0.25
+rate_hz = 50
+
+bindings = [
+    { axis = 1, joint = "base",        speed = 60.0,  when = "unshifted" },
+    { axis = 0, joint = "shoulder",    speed = 60.0,  when = "unshifted" },
+    { axis = 0, joint = "wrist_bend",  speed = 83.0,  when = "shifted" },
+    { axis = 1, joint = "wrist_twist", speed = 83.0,  when = "shifted" },
+    { axis = 4, joint = "upper_arm",   speed = 60.0 },
+    { axis = 3, joint = "elbow",       speed = -60.0 },
+    { axis = 5, joint = "gripper",     speed = -26.0, trigger = true },
+    { axis = 2, joint = "gripper",     speed = 26.0,  trigger = true },
+]
+
+# ------------------------------------------------------------------------------ ODrive settings
+# Written to the ODrives by `darm configure`. Keys are endpoint paths from the
+# firmware's flat_endpoints.json. Enum settings take names, not numbers.
+
+# Applied to every node, before its motor profile.
+[odrive]
+"can.config.baud_rate" = 1_000_000            # Explicit: 0.6.11+ defaults to autobaud.
+# Freeze-and-hold depends on this staying off: with it on, an ODrive that stops
+# hearing from the host disarms, and a disarmed joint drops under gravity.
+"axis0.config.enable_watchdog" = false
+# NaN = enter closed loop holding wherever the motor is. Any number here makes
+# the joint lunge to that position the moment it is armed.
+"axis0.config.init_pos" = nan
+# Positions count from where the ODrive powered up (the dock). `darm home`
+# re-zeroes at runtime; this keeps that from being saved into the next boot.
+"axis0.controller.config.absolute_setpoints" = false
+
+[motors.eagle_8308]
+"config.dc_bus_overvoltage_trip_level" = 54.0
+"config.dc_bus_undervoltage_trip_level" = 20.0
+"config.dc_max_positive_current" = 30.0
+"config.brake_resistor0.enable" = true
+"config.brake_resistor0.resistance" = 2.0
+"axis0.config.motor.motor_type" = "PMSM_CURRENT_CONTROL"
+"axis0.config.motor.pole_pairs" = 20
+"axis0.config.motor.torque_constant" = 0.106
+"axis0.config.motor.current_hard_max" = 45.0
+"axis0.config.motor.current_soft_max" = 40.0
+"axis0.config.motor.calibration_current" = 18.0
+"axis0.config.motor.resistance_calib_max_voltage" = 5.0
+"axis0.config.calibration_lockin.current" = 18.0
+"axis0.config.calib_range" = 0.02
+"axis0.config.encoder_bandwidth" = 1000.0
+"axis0.config.motor.current_control_bandwidth" = 1000.0
+"axis0.controller.config.control_mode" = "POSITION_CONTROL"
+"axis0.controller.config.input_mode" = "TRAP_TRAJ"
+"axis0.controller.config.input_filter_bandwidth" = 20.0
+"axis0.controller.config.vel_limit" = 20.0
+"axis0.controller.config.vel_limit_tolerance" = 1.8
+"axis0.controller.config.pos_gain" = 100.0
+"axis0.controller.config.vel_gain" = 0.55
+"axis0.controller.config.vel_integrator_gain" = 1.0
+"axis0.controller.config.inertia" = 0.0
+"axis0.trap_traj.config.vel_limit" = 5.0
+"axis0.trap_traj.config.accel_limit" = 8.0
+"axis0.trap_traj.config.decel_limit" = 8.0
+# Spinout detection is effectively off. Carried over from the old config as-is.
+"axis0.controller.config.spinout_electrical_power_threshold" = 9999.0
+"axis0.controller.config.spinout_mechanical_power_threshold" = -9999.0
+
+[motors.gb36]
+"config.dc_bus_overvoltage_trip_level" = 50.0
+"config.dc_bus_undervoltage_trip_level" = 20.0
+"config.dc_max_positive_current" = 5.0
+"config.brake_resistor0.enable" = false
+"config.brake_resistor0.resistance" = 2.0
+"axis0.config.motor.motor_type" = "PMSM_VOLTAGE_CONTROL"   # Gimbal: no current sensing, V = I * R.
+"axis0.config.motor.phase_resistance" = 16.4               # Line-to-neutral (half of line-to-line). Not calibrated:
+"axis0.config.motor.phase_resistance_valid" = true         # full calibration skips it for gimbal motors.
+"axis0.config.motor.pole_pairs" = 7
+"axis0.config.motor.torque_constant" = 0.276
+"axis0.config.motor.current_hard_max" = 3.5
+"axis0.config.motor.current_soft_max" = 3.0
+"axis0.config.motor.calibration_current" = 1.5
+"axis0.config.motor.resistance_calib_max_voltage" = 12.0
+"axis0.config.calibration_lockin.current" = 1.0
+"axis0.config.calib_range" = 0.02
+"axis0.config.encoder_bandwidth" = 1000.0
+"axis0.config.motor.current_control_bandwidth" = 1000.0
+"axis0.controller.config.control_mode" = "POSITION_CONTROL"
+"axis0.controller.config.input_mode" = "TRAP_TRAJ"
+"axis0.controller.config.input_filter_bandwidth" = 20.0
+"axis0.controller.config.vel_limit" = 30.0
+"axis0.controller.config.vel_limit_tolerance" = 1.35
+"axis0.controller.config.pos_gain" = 30.0
+"axis0.controller.config.vel_gain" = 0.04
+"axis0.controller.config.vel_integrator_gain" = 0.004
+"axis0.controller.config.inertia" = 0.0
+"axis0.trap_traj.config.vel_limit" = 30.0
+"axis0.trap_traj.config.accel_limit" = 20.0
+"axis0.trap_traj.config.decel_limit" = 20.0
+
+[motors.gm5208]
+"config.dc_bus_overvoltage_trip_level" = 50.0
+"config.dc_bus_undervoltage_trip_level" = 20.0
+"config.dc_max_positive_current" = 5.0
+"config.brake_resistor0.enable" = false
+"config.brake_resistor0.resistance" = 2.0
+"axis0.config.motor.motor_type" = "PMSM_VOLTAGE_CONTROL"   # Gimbal: no current sensing, V = I * R.
+"axis0.config.motor.phase_resistance" = 16.0               # Line-to-neutral (half of line-to-line). Not calibrated:
+"axis0.config.motor.phase_resistance_valid" = true         # full calibration skips it for gimbal motors.
+"axis0.config.motor.pole_pairs" = 11
+"axis0.config.motor.torque_constant" = 0.345
+"axis0.config.motor.current_hard_max" = 3.5
+"axis0.config.motor.current_soft_max" = 3.0
+"axis0.config.motor.calibration_current" = 1.5
+"axis0.config.motor.resistance_calib_max_voltage" = 15.0
+"axis0.config.calibration_lockin.current" = 1.5
+"axis0.config.calib_range" = 0.02
+"axis0.config.encoder_bandwidth" = 1000.0
+"axis0.config.motor.current_control_bandwidth" = 1000.0
+"axis0.controller.config.control_mode" = "POSITION_CONTROL"
+"axis0.controller.config.input_mode" = "TRAP_TRAJ"
+"axis0.controller.config.input_filter_bandwidth" = 20.0
+"axis0.controller.config.vel_limit" = 50.0
+"axis0.controller.config.vel_limit_tolerance" = 1.35
+"axis0.controller.config.pos_gain" = 50.0
+"axis0.controller.config.vel_gain" = 0.04
+"axis0.controller.config.vel_integrator_gain" = 0.004
+"axis0.controller.config.inertia" = 0.0
+"axis0.trap_traj.config.vel_limit" = 50.0
+"axis0.trap_traj.config.accel_limit" = 20.0
+"axis0.trap_traj.config.decel_limit" = 20.0
+# Spinout detection is effectively off. Carried over from the old config as-is.
+"axis0.controller.config.spinout_electrical_power_threshold" = 9999.0
+"axis0.controller.config.spinout_mechanical_power_threshold" = -9999.0
