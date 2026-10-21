@@ -21,6 +21,7 @@ from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from types import ModuleType
 
 from darm import apps
 from darm.arm.arm import Arm, MotionError, StartupError
@@ -104,7 +105,7 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _tools() -> list[object]:
+def _tools() -> list[ModuleType]:
     """Every module in darm.apps that defines register(); adding a tool never means editing this file."""
     found = []
     for info in sorted(pkgutil.iter_modules(apps.__path__), key=lambda m: m.name):
