@@ -5,17 +5,14 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable
-from pathlib import Path
 
 import pytest
 
-from darm import config as cfg
 from darm.apps import tui
 from darm.apps.console import JointKeys, Nudge
 from darm.arm.arm import ArmState, Fault, MotionError
 from darm.config import JointSpec
 
-ROOT = Path(__file__).resolve().parents[1]
 WAIT_S = 2.0
 
 
@@ -44,9 +41,7 @@ def test_left_and_right_select_joints_and_stop_at_the_ends(keys: JointKeys) -> N
     assert keys.selected.name == "gripper"
 
 
-@pytest.mark.parametrize(
-    ("key", "delta"), [("up", 1.0), ("down", -1.0), ("page up", 10.0), ("page down", -10.0)]
-)
+@pytest.mark.parametrize(("key", "delta"), [("up", 1.0), ("down", -1.0), ("page up", 10.0), ("page down", -10.0)])
 def test_steps_in_degrees(keys: JointKeys, key: str, delta: float) -> None:
     assert keys.handle(key) == Nudge("base", delta)
 
@@ -60,8 +55,13 @@ def test_steps_in_millimetres(keys: JointKeys, key: str, delta: float) -> None:
 
 @pytest.mark.parametrize(
     ("key", "action"),
-    [(" ", tui.Action.FREEZE), ("c", tui.Action.CLEAR), ("p", tui.Action.PARK), ("q", tui.Action.QUIT),
-     ("esc", tui.Action.QUIT)],
+    [
+        (" ", tui.Action.FREEZE),
+        ("c", tui.Action.CLEAR),
+        ("p", tui.Action.PARK),
+        ("q", tui.Action.QUIT),
+        ("esc", tui.Action.QUIT),
+    ],
 )
 def test_operator_keys(keys: JointKeys, key: str, action: tui.Action) -> None:
     assert keys.handle(key) is action
@@ -217,11 +217,3 @@ def test_summary_says_how_the_arm_was_left() -> None:
     assert "holding" in tui.summary(arm)  # type: ignore[arg-type]
     arm.freeze("operator")
     assert "frozen" in tui.summary(arm)  # type: ignore[arg-type]
-
-
-def test_node_labels_name_each_motor_of_a_joint() -> None:
-    labels = tui.node_labels(cfg.load(ROOT / "darm.toml").drives)
-    assert labels[0] == "base"
-    assert (labels[1], labels[2]) == ("shoulder A", "shoulder B")
-    assert (labels[5], labels[6]) == ("wrist A", "wrist B")
-    assert labels[7] == "gripper"

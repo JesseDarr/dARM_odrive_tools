@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import contextlib
 import enum
-import itertools
 import logging
 import math
 import threading
@@ -22,7 +21,7 @@ from typing import Any, TypeVar
 import urwid
 
 from darm.arm.arm import Arm, ArmState, MotionError, StartupError
-from darm.config import DriveSpec, RobotConfig
+from darm.config import RobotConfig
 from darm.odrive.bus import BusError
 from darm.odrive.node import ODriveNode, SdoTimeoutError, Stamped
 from darm.odrive.protocol import AxisState, Heartbeat, describe_errors
@@ -183,7 +182,7 @@ class TelemetryTable:
     def __init__(self, arm: Arm, show_joints: bool = True) -> None:
         self._arm = arm
         self._show_joints = show_joints
-        self._labels = node_labels(arm.config.drives)
+        self._labels = arm.config.node_labels()
         self._max_age = max_ages(arm.config)
         self.widget = urwid.Text("", wrap="clip")  # A narrow terminal loses the right edge, not the columns.
 
@@ -261,6 +260,7 @@ def run(
     panel: LogPanel,
 ) -> None:
     """Show root until a callback raises urwid.ExitMainLoop or the user presses ctrl-c."""
+
     def keys_only(key: Any) -> None:
         if isinstance(key, str):
             on_key(key)
@@ -287,23 +287,6 @@ _NODE_COLUMNS = (
     ("power W", 8),
     ("age ms", 7),
 )
-
-
-def node_labels(drives: Sequence[DriveSpec]) -> dict[int, str]:
-    """'base', 'shoulder A' / 'shoulder B', 'wrist A' / 'wrist B': which joint each node drives."""
-    labels = {}
-    for drive in drives:
-        base = _shared_words([joint.name for joint in drive.joints])
-        for index, node_id in enumerate(drive.nodes):
-            labels[node_id] = f"{base} {chr(ord('A') + index)}" if len(drive.nodes) > 1 else base
-    return labels
-
-
-def _shared_words(names: Sequence[str]) -> str:
-    """('wrist_bend', 'wrist_twist') -> 'wrist'. A lone name, or names sharing no leading word, keep the first."""
-    columns = zip(*(name.split("_") for name in names), strict=False)
-    shared = [words[0] for words in itertools.takewhile(lambda words: len(set(words)) == 1, columns)]
-    return "_".join(shared) if len(names) > 1 and shared else names[0]
 
 
 def max_ages(config: RobotConfig) -> dict[str, float]:

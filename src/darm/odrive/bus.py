@@ -108,4 +108,3 @@ class CanBus:
 
 def _node_filter(node_id: int) -> dict[str, int | bool]:
     return {"can_id": node_id << CMD_BITS, "can_mask": NODE_FILTER_MASK, "extended": False}
-

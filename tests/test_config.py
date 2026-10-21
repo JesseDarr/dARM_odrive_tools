@@ -54,8 +54,11 @@ def test_firmware_base_is_what_the_odrives_report(config: cfg.RobotConfig) -> No
 @pytest.mark.parametrize(
     ("old", "new", "message"),
     [
-        ("max_speed = 90.0\ntolerance = 3.0\n\n[[joint]]\nname = \"shoulder\"",
-         "max_sped = 90.0\ntolerance = 3.0\n\n[[joint]]\nname = \"shoulder\"", "missing 'max_speed'"),
+        (
+            'max_speed = 90.0\ntolerance = 3.0\n\n[[joint]]\nname = "shoulder"',
+            'max_sped = 90.0\ntolerance = 3.0\n\n[[joint]]\nname = "shoulder"',
+            "missing 'max_speed'",
+        ),
         ("tolerance = 1.0", 'tolerance = 1.0\ncolour = "orange"', "unknown key.*colour"),
         ("nodes = [3]", "nodes = [2]", "drive more than one joint"),
         ("min = -236.0", "min = 10.0", "min <= 0"),
@@ -74,3 +77,11 @@ def test_config_mistakes_are_rejected_before_anything_moves(
 ) -> None:
     with pytest.raises((cfg.ConfigError, KeyError), match=message):
         load_variant(tmp_path, config_text, old, new)
+
+
+def test_node_labels_name_each_motor_of_a_joint(config: cfg.RobotConfig) -> None:
+    labels = config.node_labels()
+    assert labels[0] == "base"
+    assert (labels[1], labels[2]) == ("shoulder A", "shoulder B")
+    assert (labels[5], labels[6]) == ("wrist A", "wrist B")
+    assert labels[7] == "gripper"

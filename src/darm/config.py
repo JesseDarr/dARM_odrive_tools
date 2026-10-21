@@ -7,6 +7,7 @@ back to a default is exactly the kind of bug that moves an arm somewhere new.
 
 from __future__ import annotations
 
+import itertools
 import math
 import sys
 from collections.abc import Iterable, Mapping
@@ -146,6 +147,15 @@ class RobotConfig:
 
     def drive_for_node(self, node_id: int) -> DriveSpec:
         return next(drive for drive in self.drives if node_id in drive.nodes)
+
+    def node_labels(self) -> dict[int, str]:
+        """What each node drives: 'base', 'shoulder A' / 'shoulder B', 'wrist A' / 'wrist B'."""
+        labels = {}
+        for drive in self.drives:
+            name = _shared_prefix([joint.name for joint in drive.joints])
+            for index, node_id in enumerate(drive.nodes):
+                labels[node_id] = f"{name} {chr(ord('A') + index)}" if len(drive.nodes) > 1 else name
+        return labels
 
     def settings_for(self, node_id: int) -> dict[str, SettingValue]:
         """Every endpoint value `darm configure` writes to this node, in write order."""
@@ -450,6 +460,13 @@ def _require_known(names: Iterable[str], known: Iterable[str], where: str) -> No
     unknown = sorted(set(names) - set(known))
     if unknown:
         raise ConfigError(f"{where}: unknown joint(s) {', '.join(unknown)}")
+
+
+def _shared_prefix(names: list[str]) -> str:
+    """('wrist_bend', 'wrist_twist') -> 'wrist'. A lone name, or names sharing no leading word, keep the first."""
+    columns = zip(*(name.split("_") for name in names), strict=False)
+    shared = [words[0] for words in itertools.takewhile(lambda words: len(set(words)) == 1, columns)]
+    return "_".join(shared) if len(names) > 1 and shared else names[0]
 
 
 def _positive(value: float, name: str) -> float:

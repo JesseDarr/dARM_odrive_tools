@@ -423,8 +423,7 @@ class Arm:
             node.set_input_pos(node.encoder.value.pos)
             node.request_state(AxisState.CLOSED_LOOP_CONTROL)
         failed = [
-            n for n in nodes
-            if not n.wait_until(lambda x: x.state is AxisState.CLOSED_LOOP_CONTROL, _ARM_TIMEOUT_S)
+            n for n in nodes if not n.wait_until(lambda x: x.state is AxisState.CLOSED_LOOP_CONTROL, _ARM_TIMEOUT_S)
         ]
         if failed:
             details = ", ".join(f"node {n.node_id} ({describe_errors(n.axis_error)})" for n in failed)

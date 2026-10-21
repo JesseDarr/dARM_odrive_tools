@@ -71,7 +71,6 @@ class JointKeys:
         return tui.OPERATOR_KEYS.get(key)
 
 
-
 class _JointColumn:
     def __init__(self, spec: JointSpec) -> None:
         self._spec = spec
@@ -152,7 +151,6 @@ def run(args: argparse.Namespace, ctx: Context) -> int:
             session.shutdown()
         log.info(tui.summary(arm, session))
     return 0
-
 
 
 def _signed(value: float) -> str:
