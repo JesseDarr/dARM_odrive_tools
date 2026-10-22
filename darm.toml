@@ -70,7 +70,7 @@ stage_timeout_s = 20.0
 # mm_per_turn: Linear travel per motor turn (linear joints).
 # min / max:   Hard limits in joint units. The host never commands past them.
 # max_speed:   Host-side slew limit in joint units/s. Keep it under the ODrive's
-#              trap_traj vel_limit / gear_ratio (5 turns/s at 27:1 = 66.7 deg/s),
+#              trap_traj vel_limit / gear_ratio (8 turns/s at 27:1 = 106.7 deg/s),
 #              or the ODrive's trajectory falls behind the host's.
 # tolerance:   How far measured may stray from commanded, or past a limit, before it counts.
 
@@ -121,7 +121,7 @@ node = 6
 mm_per_turn = 35.186
 min = -3.5
 max = 25.7
-max_speed = 30.0
+max_speed = 53.0
 tolerance = 1.0
 
 # Two motors drive a bevel differential through 20:72 x 20:72 belts (12.96:1).
@@ -130,8 +130,8 @@ tolerance = 1.0
 motor = "gb36"
 nodes = [4, 5]
 gear_ratio = 12.96
-bend = { name = "wrist_bend", min = -138.9, max = 138.9, max_speed = 120.0, tolerance = 3.0 }
-twist = { name = "wrist_twist", min = -277.8, max = 277.8, max_speed = 120.0, tolerance = 3.0 }
+bend = { name = "wrist_bend", min = -138.9, max = 138.9, max_speed = 125.0, tolerance = 3.0 }
+twist = { name = "wrist_twist", min = -277.8, max = 277.8, max_speed = 125.0, tolerance = 3.0 }
 
 # ------------------------------------------------------------------------------ gamepad
 # Nothing moves unless the dead-man button is held. Holding shift as well
@@ -147,12 +147,12 @@ rate_hz = 50
 bindings = [
     { axis = 1, joint = "base",        speed = 60.0,  when = "unshifted" },
     { axis = 0, joint = "shoulder",    speed = 60.0,  when = "unshifted" },
-    { axis = 0, joint = "wrist_bend",  speed = 83.0,  when = "shifted" },
-    { axis = 1, joint = "wrist_twist", speed = 83.0,  when = "shifted" },
+    { axis = 0, joint = "wrist_bend",  speed = 125.0, when = "shifted" },
+    { axis = 1, joint = "wrist_twist", speed = 125.0, when = "shifted" },
     { axis = 4, joint = "upper_arm",   speed = 60.0 },
     { axis = 3, joint = "elbow",       speed = -60.0 },
-    { axis = 5, joint = "gripper",     speed = -26.0, trigger = true },
-    { axis = 2, joint = "gripper",     speed = 26.0,  trigger = true },
+    { axis = 5, joint = "gripper",     speed = -52.8, trigger = true },
+    { axis = 2, joint = "gripper",     speed = 52.8,  trigger = true },
 ]
 
 # ------------------------------------------------------------------------------ ODrive settings
@@ -198,9 +198,9 @@ bindings = [
 "axis0.controller.config.vel_gain" = 0.55
 "axis0.controller.config.vel_integrator_gain" = 1.0
 "axis0.controller.config.inertia" = 0.0
-"axis0.trap_traj.config.vel_limit" = 5.0
-"axis0.trap_traj.config.accel_limit" = 8.0
-"axis0.trap_traj.config.decel_limit" = 8.0
+"axis0.trap_traj.config.vel_limit" = 8.0
+"axis0.trap_traj.config.accel_limit" = 4.0    # Gentler accel/decel: much less vibration in the big joints.
+"axis0.trap_traj.config.decel_limit" = 4.0
 # Spinout detection is effectively off. Carried over from the old config as-is.
 "axis0.controller.config.spinout_electrical_power_threshold" = 9999.0
 "axis0.controller.config.spinout_mechanical_power_threshold" = -9999.0
