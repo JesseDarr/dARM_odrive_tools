@@ -1,0 +1,5 @@
+# What working on darm needs: everything it runs on, plus tests, lint and type checks.
+-r requirements.txt
+pytest>=8
+ruff>=0.6
+mypy>=1.10

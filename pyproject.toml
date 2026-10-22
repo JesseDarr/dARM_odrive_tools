@@ -1,0 +1,28 @@
+# Tool settings only. darm is never installed: run it with ./darm (see README).
+# Dependencies are in requirements.txt and requirements-dev.txt.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py315"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "N", "PL", "PT"]
+ignore = [
+    "PLR2004",  # Magic numbers: protocol constants are named where they matter.
+    "PLR0913",  # Too many arguments: dataclass-style constructors read fine.
+]
+
+[tool.mypy]
+python_version = "3.15"
+strict = true
+files = ["src"]
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["can.*", "urwid.*", "pygame.*"]
+ignore_missing_imports = true
