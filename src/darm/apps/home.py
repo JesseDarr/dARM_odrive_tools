@@ -9,8 +9,6 @@ Only for an arm that is idle: re-zeroing a motor that is holding position would
 make it chase the new zero.
 """
 
-from __future__ import annotations
-
 import argparse
 import logging
 import time

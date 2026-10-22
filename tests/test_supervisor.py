@@ -1,7 +1,5 @@
 """Supervisor checks against hand-built telemetry: every way the arm can be unhealthy, one at a time."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 import pytest

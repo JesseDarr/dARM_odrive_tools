@@ -6,8 +6,6 @@ There is no continuous rotation, nothing bypasses the supervisor, and a fault
 freezes the arm like any other motion. The rest of the arm holds still.
 """
 
-from __future__ import annotations
-
 import argparse
 import logging
 from typing import TYPE_CHECKING

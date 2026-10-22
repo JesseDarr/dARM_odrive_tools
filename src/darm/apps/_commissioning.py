@@ -6,8 +6,6 @@ expected firmware and sit idle. They ask before acting. And they never assume a
 save happened without watching the node go quiet and come back.
 """
 
-from __future__ import annotations
-
 import logging
 import time
 from collections.abc import Callable, Iterable, Mapping

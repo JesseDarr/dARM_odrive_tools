@@ -7,8 +7,6 @@ off, and it stays latched until cleared. Clearing re-arms nothing.
 Exits 1 while anything is wrong, so scripts can use it as a health check.
 """
 
-from __future__ import annotations
-
 import argparse
 import logging
 import time

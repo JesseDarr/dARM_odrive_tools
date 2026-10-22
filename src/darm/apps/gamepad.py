@@ -7,8 +7,6 @@ goes away. Everything runs on urwid's thread, so pygame is only ever touched
 from the thread that started it.
 """
 
-from __future__ import annotations
-
 import argparse
 import logging
 import os
@@ -205,7 +203,7 @@ def _start_pygame() -> ModuleType | None:
     try:
         import pygame  # noqa: PLC0415  # Optional dependency: only this tool needs it.
     except ImportError:
-        log.error("the gamepad tool needs pygame: pip install 'darm[gamepad]'")
+        log.error("the gamepad tool needs pygame-ce: pip install -r requirements.txt")
         return None
     pygame.init()
     pygame.joystick.init()

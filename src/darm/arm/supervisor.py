@@ -4,8 +4,6 @@ Every check is a small function that names what is wrong in words a person can
 act on. The control loop turns any finding into a frozen arm.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterator, Mapping, Sequence
 from typing import Any
 

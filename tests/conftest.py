@@ -1,11 +1,17 @@
-"""Shared fixtures: the real darm.toml, and a simulated arm on a private virtual CAN channel."""
+"""Shared fixtures: the real darm.toml, and a simulated arm on a private virtual CAN channel.
 
-from __future__ import annotations
+Two configs. ROBOT is darm.toml exactly; tests of the supervisor's timeouts run it
+against fake clocks, where every deadline is exact. LIVE is ROBOT with timeouts wide
+enough for a desktop OS, for tests that run threads in real time: under load,
+Windows and the GIL can hold a Python thread for longer than the 100 ms the
+supervisor allows a position frame, and the arm then freezes, correctly, for a
+reason that has nothing to do with what the test is checking.
+"""
 
 import time
 import uuid
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
@@ -18,6 +24,7 @@ from darm.sim import SimNetwork
 
 REPO = Path(__file__).resolve().parents[1]
 ROBOT = cfg.load(REPO / "darm.toml")
+LIVE = replace(ROBOT, safety=replace(ROBOT.safety, heartbeat_timeout_s=1.0, encoder_timeout_s=0.5))
 
 
 def node_of(joint: str) -> int:
@@ -33,6 +40,11 @@ def motor_turns(joint: str, value: float) -> float:
 @pytest.fixture(scope="session")
 def config() -> cfg.RobotConfig:
     return ROBOT
+
+
+@pytest.fixture(scope="session")
+def live_config() -> cfg.RobotConfig:
+    return LIVE
 
 
 @pytest.fixture
@@ -51,7 +63,7 @@ class Rig:
 
 
 @pytest.fixture
-def make_rig(config: cfg.RobotConfig, tmp_path: Path) -> Iterator[Callable[..., Rig]]:
+def make_rig(live_config: cfg.RobotConfig, tmp_path: Path) -> Iterator[Callable[..., Rig]]:
     """Build a rig. prepare=fn(sim) changes the simulated ODrives before the arm discovers them.
 
     prepare runs without the simulator lock held: place() takes it itself, and the
@@ -61,12 +73,12 @@ def make_rig(config: cfg.RobotConfig, tmp_path: Path) -> Iterator[Callable[..., 
 
     def build(prepare: Callable[[SimNetwork], None] | None = None, node_ids: tuple[int, ...] | None = None) -> Rig:
         channel = f"test-{uuid.uuid4().hex}"
-        sim = SimNetwork(config, channel, node_ids)
+        sim = SimNetwork(live_config, channel, node_ids)
         if prepare is not None:
             prepare(sim)
-        bus = CanBus(channel, "virtual", config.node_ids)
+        bus = CanBus(channel, "virtual", live_config.node_ids)
         journal = Journal(tmp_path / "journal.json")
-        rig = Rig(sim, bus, Arm(config, bus, journal), journal)
+        rig = Rig(sim, bus, Arm(live_config, bus, journal), journal)
         opened.append(rig)
         rig.arm.discover()
         return rig

@@ -6,8 +6,6 @@ Every byte layout the project depends on lives in this file and nowhere else.
 Reference: https://docs.odriverobotics.com/v/latest/manual/can-protocol.html
 """
 
-from __future__ import annotations
-
 import enum
 import struct
 from dataclasses import dataclass

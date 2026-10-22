@@ -6,8 +6,6 @@ reboot is needless risk. Refuses to touch a node that is not idle, because
 changing gains or limits under a holding motor can move the arm.
 """
 
-from __future__ import annotations
-
 import argparse
 import logging
 import math

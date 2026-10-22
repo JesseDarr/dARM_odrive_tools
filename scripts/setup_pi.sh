@@ -16,8 +16,14 @@ sudo install -m 644 "${repo}/scripts/can0.service" /etc/systemd/system/can0.serv
 sudo systemctl daemon-reload
 sudo systemctl enable --now can0.service
 
+python="${PYTHON:-python3.15}"
+if ! command -v "${python}" >/dev/null 2>&1 || ! "${python}" -c 'import sys; sys.exit(sys.version_info < (3, 15))'; then
+    echo "darm needs Python 3.15. Install it, or point PYTHON at one: PYTHON=/path/to/python3.15 $0" >&2
+    exit 1
+fi
+
 echo "Installing Python dependencies into ${repo}/.venv..."
-python3 -m venv "${repo}/.venv"
+"${python}" -m venv "${repo}/.venv"
 "${repo}/.venv/bin/pip" install --quiet --upgrade pip
 "${repo}/.venv/bin/pip" install --quiet -r "${repo}/requirements.txt"
 

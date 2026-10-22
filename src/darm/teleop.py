@@ -5,8 +5,6 @@ so each one is testable without a controller in hand: the dead-man, the shift
 button, the dead zone, where a released trigger rests, and the speed cap.
 """
 
-from __future__ import annotations
-
 import math
 from collections.abc import Mapping, Sequence
 

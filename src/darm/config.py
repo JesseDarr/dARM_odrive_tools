@@ -5,23 +5,16 @@ to the bus. Unknown keys are errors too: a misspelt limit that silently falls
 back to a default is exactly the kind of bug that moves an arm somewhere new.
 """
 
-from __future__ import annotations
-
 import itertools
 import math
-import sys
+import tomllib
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, TypeVar, cast
+from typing import Any, Literal, cast
 
 from darm.odrive.endpoints import EndpointTable
 from darm.odrive.protocol import MAX_NODE_ID, ControlMode, InputMode, MotorType, base_version
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 
 SettingValue = bool | int | float
 Unit = Literal["deg", "mm"]
@@ -204,7 +197,6 @@ def check_endpoints(config: RobotConfig, table: EndpointTable) -> None:
 
 # ------------------------------------------------------------------------------ parsing
 
-T = TypeVar("T")
 _REQUIRED: Any = object()
 
 
@@ -216,7 +208,7 @@ class _Section:
         self._where = where
         self._used: set[str] = set()
 
-    def get(self, key: str, kind: type[T], default: T = _REQUIRED) -> T:
+    def get[T](self, key: str, kind: type[T], default: T = _REQUIRED) -> T:
         self._used.add(key)
         if key not in self._data:
             if default is _REQUIRED:

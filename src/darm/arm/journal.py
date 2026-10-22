@@ -8,8 +8,6 @@ is verifiably back. An arm that reads all zeros but was last left away has
 almost certainly been power-cycled out of the dock.
 """
 
-from __future__ import annotations
-
 import json
 import os
 import time
@@ -24,7 +22,7 @@ class Journal:
         """True or False as last recorded, None if nothing has been recorded (or the note is unreadable)."""
         try:
             docked = json.loads(self.path.read_text(encoding="utf-8"))["docked"]
-        except (OSError, ValueError, KeyError, TypeError):
+        except OSError, ValueError, KeyError, TypeError:
             return None
         return docked if isinstance(docked, bool) else None
 

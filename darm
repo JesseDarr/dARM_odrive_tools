@@ -8,6 +8,9 @@
 import sys
 from pathlib import Path
 
+if sys.version_info < (3, 15):  # Checked first: older Pythons cannot even parse darm.
+    sys.exit(f"darm needs Python 3.15, not {sys.version.split()[0]}. Activate the venv: source .venv/bin/activate")
+
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 from darm.cli import main  # After the line above: the package lives in src/.

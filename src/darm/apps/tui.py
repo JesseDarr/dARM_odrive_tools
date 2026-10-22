@@ -6,8 +6,6 @@ urwid's own thread, from alarms. Other threads never touch a widget: the
 arm's control loop logs into a queue, and the next redraw picks it up.
 """
 
-from __future__ import annotations
-
 import contextlib
 import enum
 import logging
@@ -16,7 +14,7 @@ import threading
 from collections import deque
 from collections.abc import Callable, Hashable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from typing import Any, TypeVar
+from typing import Any
 
 import urwid
 
@@ -28,7 +26,6 @@ from darm.odrive.protocol import AxisState, Heartbeat, describe_errors
 
 log = logging.getLogger(__name__)
 
-T = TypeVar("T")
 Segment = str | tuple[str, str]
 Markup = list[Segment]
 
@@ -361,7 +358,7 @@ def _state(heartbeat: Stamped[Heartbeat], now: float, max_age: float, width: int
     return _align(_STATE_LABELS.get(state, state.name.lower()), width, left=True)
 
 
-def _cell(stamped: Stamped[T] | None, now: float, max_age: float, render: Callable[[T], str], width: int) -> Segment:
+def _cell[T](stamped: Stamped[T] | None, now: float, max_age: float, render: Callable[[T], str], width: int) -> Segment:
     if stamped is None:
         return ("dim", _align("-", width))
     return _fresh(stamped, now, max_age, _align(render(stamped.value), width))
@@ -373,7 +370,7 @@ def _age(node: ODriveNode, now: float, max_age: float, width: int) -> Segment:
     return _fresh(node.encoder, now, max_age, _align(f"{node.encoder.age(now) * 1000:.0f}", width))
 
 
-def _fresh(stamped: Stamped[T], now: float, max_age: float, text: str) -> Segment:
+def _fresh[T](stamped: Stamped[T], now: float, max_age: float, text: str) -> Segment:
     return ("warn", text) if stamped.age(now) > max_age else text
 
 

@@ -5,15 +5,12 @@ Rebinding an attribute is atomic in CPython, so any thread reading node.encoder
 gets a complete message from one frame without taking a lock.
 """
 
-from __future__ import annotations
-
 import logging
 import struct
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Generic, TypeVar
 
 from darm.odrive import protocol as p
 from darm.odrive.bus import CanBus
@@ -21,14 +18,13 @@ from darm.odrive.endpoints import Endpoint, EndpointTable
 
 log = logging.getLogger(__name__)
 
-T = TypeVar("T")
 
 DEFAULT_SDO_TIMEOUT_S = 0.1
 _POLL_INTERVAL_S = 0.01
 
 
 @dataclass(frozen=True, slots=True)
-class Stamped(Generic[T]):
+class Stamped[T]:
     value: T
     at: float  # time.monotonic() when the frame arrived
 
@@ -163,7 +159,7 @@ class ODriveNode:
 
     # ------------------------------------------------------------ internals
 
-    def _poll(self, cmd: p.Cmd, latest: Callable[[ODriveNode], Stamped[T] | None], timeout: float) -> T:
+    def _poll[T](self, cmd: p.Cmd, latest: Callable[[ODriveNode], Stamped[T] | None], timeout: float) -> T:
         """Ask for one Get_* message with a remote frame and wait for a reply newer than the question."""
         asked_at = time.monotonic()
         self._bus.send(self.node_id, cmd, remote=True)

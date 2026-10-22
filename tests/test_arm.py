@@ -1,7 +1,5 @@
 """The arm against simulated ODrives: taking control, moving, every fault path, and parking."""
 
-from __future__ import annotations
-
 import re
 import struct
 import time

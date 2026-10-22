@@ -9,8 +9,6 @@ cannot be read over CANSimple and are left out. A read that gets no answer is
 recorded as null. Nodes are read in parallel: each has its own request channel.
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import logging

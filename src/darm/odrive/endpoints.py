@@ -5,8 +5,6 @@ against an ODrive running another writes values into the wrong settings, which
 is why the table carries its firmware version and every tool checks it.
 """
 
-from __future__ import annotations
-
 import difflib
 import json
 import struct

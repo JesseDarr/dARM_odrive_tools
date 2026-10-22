@@ -1,7 +1,5 @@
 """SDO and polling against a hand-driven fake ODrive, to replay exactly the frame orders that broke the old code."""
 
-from __future__ import annotations
-
 import struct
 import threading
 import uuid

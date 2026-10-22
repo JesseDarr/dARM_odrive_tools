@@ -1,7 +1,5 @@
 """Console and operator-session logic, driven without a terminal or an arm."""
 
-from __future__ import annotations
-
 import threading
 import time
 from collections.abc import Callable

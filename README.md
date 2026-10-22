@@ -24,8 +24,9 @@ darm exercise     sweep a joint through its range (spreads grease)
 ## Running it
 
 Nothing to install. `darm` at the repo root is a Python script with a `#!/usr/bin/env python3`
-shebang that runs the tools straight from this checkout. Python 3.10 or newer, plus the
-libraries in `requirements.txt`:
+shebang that runs the tools straight from this checkout. It needs **Python 3.15** (only the
+latest is supported, and the launcher says so if it gets an older one), plus the libraries in
+`requirements.txt`:
 
 ```bash
 # On the Pi, once (after enabling the CAN HAT, see "Setting up the Pi"):
@@ -35,7 +36,7 @@ source .venv/bin/activate
 
 ```powershell
 # Anywhere else, e.g. to try every tool against simulated ODrives:
-python -m venv .venv
+py -3.15 -m venv .venv            # bash: python3.15 -m venv .venv
 .venv\Scripts\Activate.ps1        # bash: source .venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -108,10 +109,12 @@ Quitting a tool (`q`, Esc, Ctrl-C) leaves the arm **holding** its position. Use 
    dtoverlay=spi0-hw-cs
    ```
    `dmesg | grep -i mcp251` should show the controller.
-2. Clone this repo and run `scripts/setup_pi.sh`. It installs a service that brings `can0` up at
+2. Install Python 3.15. Ubuntu's own `python3` usually trails the newest release, so check
+   `python3 --version`; if it isn't 3.15, `uv python install 3.15` or the deadsnakes PPA gets it.
+3. Clone this repo and run `scripts/setup_pi.sh`. It installs a service that brings `can0` up at
    boot (1 Mbit/s, automatic bus-off recovery, a 256-frame transmit queue) and puts the Python
-   libraries darm needs into `.venv`.
-3. `source .venv/bin/activate`, then `./darm monitor`. See [Running it](#running-it).
+   libraries darm needs into `.venv`, built with `python3.15` (set `PYTHON=` to use another path).
+4. `source .venv/bin/activate`, then `./darm monitor`. See [Running it](#running-it).
 
 `scripts/reset_interfaces.sh` restarts CAN and Bluetooth without a reboot, then prints the bus
 statistics. A climbing `rx_over_errors` count means the MCP2515 is dropping frames.
@@ -178,7 +181,7 @@ graph TD
 ## Development
 
 ```powershell
-python -m venv .venv; .venv\Scripts\activate      # or: source .venv/bin/activate
+py -3.15 -m venv .venv; .venv\Scripts\activate   # or: python3.15 -m venv .venv; source .venv/bin/activate
 pip install -r requirements-dev.txt
 pytest                 # the full suite runs against simulated ODrives, no hardware needed
 ruff check src tests

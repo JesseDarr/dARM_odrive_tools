@@ -1,11 +1,8 @@
 """The commissioning tools, run for real against a simulated arm the test can reach into."""
 
-from __future__ import annotations
-
 import argparse
 import dataclasses
 import json
-import threading
 import uuid
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
@@ -42,15 +39,15 @@ Station = Callable[..., tuple[SimNetwork, SimContext]]
 
 
 @pytest.fixture
-def station(config: RobotConfig, tmp_path: Path) -> Iterator[Station]:
-    """Build a simulated arm and a Context wired to it."""
+def station(live_config: RobotConfig, tmp_path: Path) -> Iterator[Station]:
+    """Build a simulated arm and a Context wired to it. Real-time threads, so LIVE timeouts (see conftest)."""
     networks: list[SimNetwork] = []
 
     def build(node_ids: tuple[int, ...] | None = None, freshly_flashed: bool = False) -> tuple[SimNetwork, SimContext]:
         channel = f"test-{uuid.uuid4().hex}"
-        sim = SimNetwork(config, channel, node_ids, freshly_flashed)
+        sim = SimNetwork(live_config, channel, node_ids, freshly_flashed)
         networks.append(sim)
-        return sim, SimContext(config, True, tmp_path / "state", channel)
+        return sim, SimContext(live_config, True, tmp_path / "state", channel)
 
     yield build
     for sim in networks:
@@ -245,21 +242,17 @@ def test_exercise_sweeps_the_joint_and_puts_it_back(station: Station, config: Ro
     sim, ctx = station()
     gripper = sim.nodes[node_of("gripper")]
     samples: list[float] = []
-    running = threading.Event()
-    running.set()
+    step = gripper.step
 
-    def sample() -> None:
-        while running.is_set():
-            samples.append(gripper.pos)
-            running.wait(0.005)
+    def step_and_record(now: float, dt: float) -> None:
+        """Record on the simulator's own thread. A polling thread of our own fights it for the GIL,
+        and on Windows that stretches its 2 ms steps past the supervisor's 100 ms encoder timeout."""
+        step(now, dt)
+        samples.append(gripper.pos)
 
-    sampler = threading.Thread(target=sample, daemon=True)
-    sampler.start()
-    try:
-        assert run_tool(ctx, "exercise", "gripper", "--cycles", "1", "--yes") == 0
-    finally:
-        running.clear()
-        sampler.join()
+    with sim.locked():
+        gripper.step = step_and_record  # type: ignore[method-assign]
+    assert run_tool(ctx, "exercise", "gripper", "--cycles", "1", "--yes") == 0
 
     turns_per_mm = config.drive_for_node(node_of("gripper")).turns_per_unit
     low, high = exercise.sweep_range(config.joints["gripper"], 0.9)

@@ -13,8 +13,6 @@ Tools never open the bus themselves. They ask the Context, which is how
 `darm --sim <tool>` runs any tool against simulated ODrives instead of hardware.
 """
 
-from __future__ import annotations
-
 import argparse
 import importlib
 import logging

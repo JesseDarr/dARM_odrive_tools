@@ -9,8 +9,6 @@ sag under gravity; tests inject faults explicitly.
 One thread runs the whole network, so a simulation step is deterministic.
 """
 
-from __future__ import annotations
-
 import contextlib
 import math
 import struct

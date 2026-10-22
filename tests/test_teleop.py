@@ -1,7 +1,5 @@
 """Every rule that decides whether a gamepad moves the arm, checked without a gamepad."""
 
-from __future__ import annotations
-
 import math
 
 import pytest

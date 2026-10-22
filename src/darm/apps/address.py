@@ -12,8 +12,6 @@ Every change goes to an ODrive this run just found, by its serial number. Each
 new id is saved and then confirmed by watching the ODrive reboot under it.
 """
 
-from __future__ import annotations
-
 import argparse
 import logging
 from collections.abc import Mapping

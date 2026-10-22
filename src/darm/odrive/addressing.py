@@ -11,8 +11,6 @@ message carrying serial 0 is a wildcard that every ODrive hearing it obeys, so
 nothing here ever sends one.
 """
 
-from __future__ import annotations
-
 import threading
 import time
 from collections.abc import Iterable

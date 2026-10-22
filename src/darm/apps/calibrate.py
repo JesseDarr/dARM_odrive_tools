@@ -9,8 +9,6 @@ finished with SUCCESS; a stale result from an earlier run never counts. A
 failed calibration is reported and never saved.
 """
 
-from __future__ import annotations
-
 import argparse
 import logging
 import time

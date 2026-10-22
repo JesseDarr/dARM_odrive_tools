@@ -5,8 +5,6 @@ steal each other's frames, and every reply that lands on the wrong thread is
 silently lost. Routing every frame from a single place makes that impossible.
 """
 
-from __future__ import annotations
-
 import logging
 import threading
 import time

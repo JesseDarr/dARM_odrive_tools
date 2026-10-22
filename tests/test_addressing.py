@@ -1,7 +1,5 @@
 """Address-based discovery and node id assignment, against simulated ODrives fresh from a flash."""
 
-from __future__ import annotations
-
 import argparse
 import uuid
 from collections.abc import Callable, Iterator

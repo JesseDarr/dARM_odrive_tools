@@ -5,8 +5,6 @@ nudge goes through the arm, which clamps it to limits, slews it at the joint's
 safe speed, and ignores it entirely while frozen.
 """
 
-from __future__ import annotations
-
 import argparse
 import logging
 import math

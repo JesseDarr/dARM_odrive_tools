@@ -7,8 +7,6 @@ Two mechanisms cover every joint on the arm:
 Both are linear, so the same mapping converts positions and velocities.
 """
 
-from __future__ import annotations
-
 import abc
 from collections.abc import Sequence
 

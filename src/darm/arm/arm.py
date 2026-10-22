@@ -9,8 +9,6 @@ may be called from any other thread. A single lock covers each tick end to end,
 so a freeze can never interleave with a half-sent setpoint.
 """
 
-from __future__ import annotations
-
 import enum
 import logging
 import math

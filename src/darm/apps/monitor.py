@@ -5,8 +5,6 @@ screen sends a command, so it is safe to leave running next to another tool
 (each process gets its own copy of every frame on the bus).
 """
 
-from __future__ import annotations
-
 import argparse
 import time
 from typing import TYPE_CHECKING
